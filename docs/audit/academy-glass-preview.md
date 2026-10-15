@@ -1,5 +1,9 @@
 # Academy glass preview
 
+Historical preview report. The subsequent release preparation installed the
+verified local Academy logo and converter thumbnail; see
+[release readiness](release-readiness-2026-10-15.md).
+
 This UI branch is based on reader cleanup commit
 `956670d0656c02c6cae390fa6103d0f7c30fa71a`. Reader services, conversion core,
 credentials, parser/AI routes and numerical behavior are unchanged.

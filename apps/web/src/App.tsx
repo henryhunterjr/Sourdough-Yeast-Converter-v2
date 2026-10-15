@@ -7,6 +7,7 @@ import { EXAMPLES } from './examples';
 import { RecipeView } from './components/RecipeView';
 import { OptionsSheet, DEFAULT_OPTIONS, type Options } from './components/OptionsSheet';
 import { Icon } from './components/Icon';
+import { AdaptationNotice, adaptationText } from './components/AdaptationNotice';
 
 type Direction = 'to-sourdough' | 'to-yeast';
 
@@ -96,7 +97,8 @@ export default function App() {
 
   const outputText = () => {
     const r = tab === 'converted' && conversion ? conversion.recipe : original;
-    return r ? renderRecipe(r) + `\n\n${s.appName} · bakinggreatbread.blog` : '';
+    const notice = tab === 'converted' && conversion && original ? `\n\n${adaptationText(original, s)}` : '';
+    return r ? renderRecipe(r) + notice + `\n\n${s.appName} · bakinggreatbread.blog` : '';
   };
   async function copy() {
     try { await navigator.clipboard.writeText(outputText()); setToast(s.copied); } catch { /* ignore */ }
@@ -121,6 +123,7 @@ export default function App() {
       <a className="skip-link" href="#workspace">{s.paste}</a>
       <header className="topbar">
         <div className="brand">
+          <img className="brand-logo" src="/brand/academy-logo.png" width="1280" height="720" alt="" />
           <div className="brand-name">{s.academy}</div>
           <span className="brand-divider" />
           <span className="brand-tool">{s.shortName}</span>
@@ -144,6 +147,7 @@ export default function App() {
               <div className="card-heading"><h2><label htmlFor="recipe-text">{s.paste}</label></h2><span>{s.inputFormats}</span></div>
               <textarea id="recipe-text" className="paste" aria-describedby="recipe-help" value={text} onChange={e => setText(e.target.value)} placeholder={s.pastePlaceholder} spellCheck={false} autoCapitalize="off" />
               <p id="recipe-help" className="input-help">{s.inputHelp}</p>
+              <p className="input-help authored-alternate">{s.authoredAlternate}</p>
               <div className="attach-row">
                 <button className="btn secondary" onClick={() => cameraRef.current?.click()} disabled={preparing}><Icon name="camera" />{s.takePhoto}</button>
                 <button className="btn secondary" onClick={() => fileRef.current?.click()} disabled={preparing}>{preparing ? <><span className="spinner" />{s.preparing}</> : <><Icon name="upload" />{s.upload}</>}</button>
@@ -238,6 +242,7 @@ export default function App() {
               {tab === 'converted' && conversion ? (
                 <>
                   {original.title && <h2 className="recipe-title">{original.title}</h2>}
+                  <AdaptationNotice original={original} s={s} />
                   {conversion.levain && (
                     <div className="flag info" style={{ marginBottom: 12 }}><span className="dot" /><div>
                       <b>{s.levainBuild}:</b> {Math.round(conversion.levain.seed)}g starter + {Math.round(conversion.levain.flour)}g flour + {Math.round(conversion.levain.water)}g water = {Math.round(conversion.levain.total)}g ({conversion.levain.hydration}%, {conversion.levain.prefermentedFlourPct}% PFF)
