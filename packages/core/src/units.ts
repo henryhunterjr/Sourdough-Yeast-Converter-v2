@@ -67,7 +67,8 @@ const UNIT_WORDS = [
 const UNIT_RE = UNIT_WORDS.map(u => u.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
 
 /** "3 1/2", "3½", "1.25", "½", "2-3" (takes the first number of a range). */
-const AMOUNT_RE = `(\\d+(?:[.,]\\d+)?(?:\\s*[-–]\\s*\\d+(?:[.,]\\d+)?)?(?:\\s+\\d+/\\d+|\\s*[½⅓⅔¼¾⅛⅜⅝⅞⅕⅖⅗⅘])?|\\d+/\\d+|[½⅓⅔¼¾⅛⅜⅝⅞⅕⅖⅗⅘])`;
+// Plain fractions come first so "1/3 cup" is never read as "1" followed by "/3 cup".
+const AMOUNT_RE = `(\\d+/\\d+|\\d+(?:[.,]\\d+)?(?:\\s*[-–]\\s*\\d+(?:[.,]\\d+)?)?(?:\\s+\\d+/\\d+|\\s*[½⅓⅔¼¾⅛⅜⅝⅞⅕⅖⅗⅘])?|[½⅓⅔¼¾⅛⅜⅝⅞⅕⅖⅗⅘])`;
 
 export interface ParsedAmount {
   amount: number;

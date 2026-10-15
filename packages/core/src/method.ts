@@ -36,10 +36,12 @@ const T = {
   },
 } as const;
 
-const RISE_WORDS = /\b(rise|rises|rising|proof|proofs|proofing|ferment|ferments|fermentation|bulk|double|doubled|puffy|levar|leudar|leude|fermentar|fermentación|duplic|esponjos)\b/i;
+const RISE_WORDS = /\b(rise|rises|rising|proof|proofs|proofing|ferment\w*|bulk|double|doubled|puffy|lev(?:a|e|ar|ado|ada|en)|leud\w*|duplic\w*|esponjos\w*)\b/i;
 const BAKE_WORDS = /\b(bake|baking|oven|preheat|hornea|hornear|horno|precalienta)/i;
 const COLD_WORDS = /\b(fridge|refrigerat|retard|overnight|cold|nevera|refrigera|frío|fria|toda la noche)/i;
 const YEAST_PROOF = /\b(dissolve|proof|bloom|activate|foamy|sprinkle)\w*\b[^.]*\byeast\b|\byeast\b[^.]*\b(foamy|bubbl|dissolve|activate)|\b(disuelve|disolver|activa|activar|espum)\w*[^.]*\blevadura\b|\blevadura\b[^.]*\b(espum|disuel|activ)/i;
+const YEAST_ADD = /\b(whisk|stir|mix|add|sprinkle|combine)\b[^.]*\byeast\b|\b(mezcla|añade|agrega|espolvorea|bate)\w*\b[^.]*\blevadura\b/i;
+const YEAST_WAIT = /\b(let|allow)\b[^.]*\b(stand|sit|rest|proof)\b|\b(foamy|bubbly|bubbles|creamy)\b|\b(deja|dejar|reposa)\w*\b[^.]*\b(minutos|espum|burbuj)/i;
 const LEVAIN_BUILD = /\b(build|feed|refresh|prepare|make)\b[^.]*\b(levain|starter)\b[^.]*\b(night|hours? (before|ahead)|overnight|doubled|double|ripe|peak|bubbly)\b|\b(prepara|alimenta|refresca)\b[^.]*\b(levain|masa madre)\b[^.]*\b(noche|horas antes|duplic|burbuj)/i;
 const YEAST_AMOUNT = /\b\d+(?:[.,]\d+)?\s*(?:g|grams?|tsp|teaspoons?|tbsp|tablespoons?|packets?|envelopes?|cucharaditas?|cucharadas?|sobres?)\s+(?:of\s+|de\s+)?(?:(?:instant|active dry|dry|fresh)\s+)?yeast\b|\b\d+(?:[.,]\d+)?\s*(?:g|gramos?)\s+(?:de\s+)?levadura(?:\s+(?:instantánea|seca|fresca|activa))?\b/gi;
 
@@ -138,15 +140,31 @@ export function editMethodToSourdough(
     let note: string | undefined;
 
     // Sentence-level: replace only the yeast-proofing sentence.
-    let text = s.text.split(SENTENCE_SPLIT).map(sentence => {
-      if (YEAST_PROOF.test(sentence)) { changed = 'edited'; note = `Replaced: "${sentence}"`; return t.dissolveLevain; }
+    // A proofing step is often two sentences: "whisk in the yeast" then "let stand until foamy".
+    const sentences = s.text.split(SENTENCE_SPLIT);
+    const drop = new Set<number>();
+    for (let i = 0; i < sentences.length; i++) {
+      const cur = sentences[i]!, next = sentences[i + 1];
+      if (YEAST_PROOF.test(cur)) {
+        if (next && YEAST_WAIT.test(next) && !/\b(flour|harina)\b/i.test(next)) drop.add(i + 1);
+      } else if (YEAST_ADD.test(cur) && next && YEAST_WAIT.test(next) && !/\b(flour|harina)\b/i.test(next)) {
+        sentences[i] = cur + ' ' + next; // treat as one proofing sentence
+        drop.add(i + 1);
+      }
+    }
+    let text = sentences.map((sentence, i) => {
+      if (drop.has(i)) return '';
+      if (YEAST_PROOF.test(sentence) || (YEAST_ADD.test(sentence) && YEAST_WAIT.test(sentence))) { changed = 'edited'; note = `Replaced: "${sentence}"`; return t.dissolveLevain; }
       return sentence;
-    }).join(' ');
+    }).filter(Boolean).join(' ');
 
     if (/\byeast\b|\blevadura\b/i.test(text)) {
       text = text
         .replace(YEAST_AMOUNT, t.allLevain)
         .replace(/\b(?:(?:instant|active dry|dry|fresh)\s+)?yeast\b/gi, t.levainWord)
+        .replace(/\ba la levadura(?:\s+(?:instantánea|seca|fresca|activa))?\b/gi, 'al ' + t.levainWord)
+        .replace(/\bde la levadura(?:\s+(?:instantánea|seca|fresca|activa))?\b/gi, 'del ' + t.levainWord)
+        .replace(/\bla levadura(?:\s+(?:instantánea|seca|fresca|activa))?\b/gi, 'el ' + t.levainWord)
         .replace(/\blevadura(?:\s+(?:instantánea|seca|fresca|activa))?\b/gi, t.levainWord);
       changed = 'edited';
     }
@@ -183,6 +201,9 @@ export function editMethodToYeast(
         return sentence
           .replace(/\ball (of )?the (levain|starter)\b/gi, `the ${t.yeastWord}`)
           .replace(/\btod[oa] (el|la) (levain|masa madre)\b/gi, `la ${t.yeastWord}`)
+          .replace(/\bal (levain|masa madre)\b/gi, `a la ${t.yeastWord}`)
+          .replace(/\bdel (levain|masa madre)\b/gi, `de la ${t.yeastWord}`)
+          .replace(/\bel (levain|masa madre)\b/gi, `la ${t.yeastWord}`)
           .replace(/\b(ripe |active |madura |activa )?(levain|sourdough starter|starter|masa madre)\b/gi, t.yeastWord);
       }
       return sentence;

@@ -214,7 +214,8 @@ export function convertToYeast(input: Recipe, opts: ToYeastOptions = {}): Conver
   const after = analyze(recipe);
   const pct = opts.yeastPct ?? 0.01;
   const instant = after.totalFlour * pct;
-  const yeast = { instant, activeDry: instant * 1.25, fresh: instant * 3, pct: pct * 100 };
+  const r2 = (n: number) => Math.round(n * 2) / 2;
+  const yeast = { instant: r2(instant), activeDry: r2(instant * 1.25), fresh: Math.round(instant * 3), pct: Math.round(pct * 1000) / 10 };
   const kind = opts.kind ?? 'instant';
   const grams = kind === 'instant' ? instant : kind === 'active-dry' ? yeast.activeDry : yeast.fresh;
   const name =
@@ -223,7 +224,10 @@ export function convertToYeast(input: Recipe, opts: ToYeastOptions = {}): Conver
       : kind === 'instant' ? 'instant yeast' : kind === 'active-dry' ? 'active dry yeast' : 'fresh yeast';
   mainDough.ingredients.push({ name, grams, role: 'yeast', yeastKind: kind });
 
-  notes.push({ level: 'info', message: `${name[0]!.toUpperCase() + name.slice(1)} at ${(grams / after.totalFlour * 100).toFixed(1)}% of flour (instant ${Math.round(yeast.instant * 2) / 2}g, active dry ${Math.round(yeast.activeDry * 2) / 2}g, fresh ${Math.round(yeast.fresh)}g are interchangeable).` });
+  const Name = name[0]!.toUpperCase() + name.slice(1);
+  notes.push({ level: 'info', message: recipe.language === 'es'
+    ? `${Name} al ${(grams / after.totalFlour * 100).toFixed(1)}% de la harina (instantánea ${yeast.instant}g, seca activa ${yeast.activeDry}g o fresca ${yeast.fresh}g son intercambiables).`
+    : `${Name} at ${(grams / after.totalFlour * 100).toFixed(1)}% of flour (instant ${yeast.instant}g, active dry ${yeast.activeDry}g, fresh ${yeast.fresh}g are interchangeable).` });
 
   recipe.steps = editMethodToYeast(recipe.steps, { language: recipe.language ?? 'en', richness: after.richness, yeastKind: kind });
 

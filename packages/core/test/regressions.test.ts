@@ -142,3 +142,41 @@ function yeastedBase(): Recipe {
 function sdBase(): Recipe {
   return parseRecipeText(`Loaf\n450g bread flour\n300g water\n100g sourdough starter\n10g salt`).recipe;
 }
+
+describe('web-app review fixes', () => {
+  it('reads "1/3 cup (67g) sugar" as 67g of sugar, not "/3 cup sugar"', () => {
+    const p = parseAmount('1/3 cup (67g) sugar')!;
+    expect(p.amount).toBe(67);
+    expect(p.name).toBe('sugar');
+    expect(parseAmount('1/2 cup (113g) butter, softened')!.name).toBe('butter');
+  });
+  it('replaces a two-sentence yeast proofing step as one', () => {
+    const r = parseRecipeText('500g flour\n300g milk\n5g instant yeast\n10g salt\n\n1. Warm the milk and whisk in the yeast and a pinch of sugar. Let stand 5 minutes until foamy.\n2. Add the flour and salt and knead.', 100).recipe;
+    const c = convertToSourdough(r);
+    const step = c.recipe.steps[1]!.text;
+    expect(step).not.toMatch(/foamy|stand 5 minutes/);
+    expect(step).toMatch(/dissolve it in the liquid/);
+    expect(step).not.toMatch(/\bwhisk in the levain\b/);
+  });
+});
+
+describe('Spanish method review fixes', () => {
+  const es = 'Pan de masa madre\n\nLevain\n20g masa madre activa\n50g harina de fuerza\n50g agua\n\nMasa\ntodo el levain\n450g harina de fuerza\n300g agua\n10g sal\n\nMétodo\n1. Mezcla la harina y el agua, deja reposar 30 minutos.\n2. Añade el levain y la sal. Fermenta 4 horas con pliegues cada 30 minutos.\n3. Forma y deja levar 2 horas.';
+  it('keeps Spanish articles agreeing and rescales "fermenta N horas" but not the fold cadence', () => {
+    const c = convertToYeast(parseRecipeText(es, 100).recipe);
+    const text = c.recipe.steps.map(s => s.text).join('\n');
+    expect(text).toMatch(/Añade la levadura y la sal/);
+    expect(text).not.toMatch(/el levadura/);
+    expect(text).toMatch(/cada 30 minutos/);
+    expect(text).not.toMatch(/Fermenta 4 horas/);
+    expect(c.yeast!.instant).toBe(5);
+    expect(c.yeast!.activeDry).toBe(6.5);
+    expect(c.notes.some(n => /intercambiables/.test(n.message))).toBe(true);
+  });
+  it('to sourdough: "la levadura" becomes "el levain"', () => {
+    const r = parseRecipeText('500g harina\n350g agua\n10g sal\n5g levadura instantánea\n\nMétodo\n1. Mezcla la harina con el agua y añade la levadura. Deja levar 1 hora.', 100).recipe;
+    const text = convertToSourdough(r).recipe.steps.map(s => s.text).join('\n');
+    expect(text).toMatch(/añade el levain/);
+    expect(text).not.toMatch(/la levain/);
+  });
+});

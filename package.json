@@ -1,0 +1,16 @@
+{
+  "name": "sourdough-yeast-converter",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/core",
+    "services/reader",
+    "apps/web"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/core && npm run build -w services/reader && npm run build -w apps/web",
+    "test": "npm test -w packages/core && npm test -w services/reader",
+    "dev": "npm run build -w packages/core && npm run build -w services/reader && npm run dev -w apps/web"
+  }
+}

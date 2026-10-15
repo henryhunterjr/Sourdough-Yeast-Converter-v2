@@ -62,12 +62,14 @@ export function parseRecipeText(text: string, starterHydration = 100): ParseResu
 
   // Find where the method starts, on this same array of lines.
   let methodStart = rawLines.findIndex(l => METHOD_HEADING.test(l));
+  let headingLines = 1;
   if (methodStart === -1) {
-    // Fallback: first numbered line that isn't an ingredient and is a sentence.
+    // Fallback: first numbered line that isn't an ingredient and is a sentence. It is a step, not a heading, so keep it.
     methodStart = rawLines.findIndex(l => /^\s*(\d+[.)]|step \d+)\s+/i.test(l) && l.trim().length > 35 && !parseAmount(l.replace(/^\s*(\d+[.)]|step \d+)\s+/i, '')));
+    headingLines = 0;
   }
   const ingredientLines = methodStart === -1 ? rawLines : rawLines.slice(0, methodStart);
-  const methodLines = methodStart === -1 ? [] : rawLines.slice(methodStart + 1);
+  const methodLines = methodStart === -1 ? [] : rawLines.slice(methodStart + headingLines);
 
   const components: Component[] = [];
   let current: Component | null = null;
