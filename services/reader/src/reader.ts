@@ -17,7 +17,7 @@ import {
   type Recipe, type Component, type Ingredient, type Role, type ComponentKind,
 } from '@bgb/dough-core';
 import { COMPONENT_KINDS, ROLES, type ReadRecipe, type ReadIngredient } from './schema.js';
-import type { Provider } from './providers.js';
+import type { Provider, ReadInput } from './providers.js';
 
 export interface Flag {
   level: 'error' | 'warning' | 'info';
@@ -34,6 +34,8 @@ export interface ReadResult {
   flags: Flag[];
   /** What the model said it was unsure about, verbatim. */
   uncertainties: string[];
+  /** For photo or scan input: the model's transcription, so the baker can compare. */
+  transcript?: string;
 }
 
 export interface ReadOptions {
@@ -42,8 +44,12 @@ export interface ReadOptions {
   crossCheck?: boolean;
 }
 
-export async function readRecipe(text: string, provider: Provider | null, opts: ReadOptions = {}): Promise<ReadResult> {
+export async function readRecipe(input: string | ReadInput, provider: Provider | null, opts: ReadOptions = {}): Promise<ReadResult> {
   const starterHydration = opts.starterHydration ?? 100;
+  const inp: ReadInput = typeof input === 'string' ? { text: input } : input;
+  const hasImages = !!inp.images?.length;
+  const text = inp.text ?? '';
+
   const fallback = () => {
     const p = parseRecipeText(text, starterHydration);
     return {
@@ -53,32 +59,49 @@ export async function readRecipe(text: string, provider: Provider | null, opts: 
       uncertainties: [],
     };
   };
+  const empty = (message: string): ReadResult => ({
+    recipe: { components: [], steps: [], starterHydration },
+    source: 'parser', flags: [{ level: 'error', message }], uncertainties: [],
+  });
 
-  if (!provider) return { ...fallback(), flags: [{ level: 'info', message: 'No AI reader configured; used the built-in parser.' }, ...fallback().flags] };
+  if (!provider) {
+    if (hasImages && !text.trim()) return empty('Reading a photo or scan needs the AI reader, which is not configured. Paste the recipe as text instead.');
+    return { ...fallback(), flags: [{ level: 'info', message: 'No AI reader configured; used the built-in parser.' }, ...fallback().flags] };
+  }
 
   let raw: string;
   try {
-    raw = await provider.read(text);
+    raw = await provider.read(inp);
   } catch (e) {
+    if (hasImages && !text.trim()) return empty(`AI reader unavailable (${(e as Error).message}). Try again, or paste the recipe as text.`);
     const fb = fallback();
     return { ...fb, flags: [{ level: 'warning', message: `AI reader unavailable (${(e as Error).message}); used the built-in parser.` }, ...fb.flags] };
   }
 
   const parsed = parseModelJson(raw);
   if (!parsed.ok) {
+    if (hasImages && !text.trim()) return empty(`AI reader returned an unusable answer (${parsed.error}). Try a clearer photo, or paste the recipe as text.`);
     const fb = fallback();
     return { ...fb, flags: [{ level: 'warning', message: `AI reader returned an unusable answer (${parsed.error}); used the built-in parser.` }, ...fb.flags] };
   }
 
+  // For images the model's own transcription stands in for the source text:
+  // amounts are checked against it and the deterministic parser runs on it.
+  const sourceText = text.trim() ? text : parsed.value.transcript;
   const flags: Flag[] = [];
-  const recipe = toRecipe(parsed.value, text, starterHydration, flags);
+  if (hasImages) {
+    flags.push({ level: 'info', message: sourceText.trim()
+      ? 'Read from a photo or scan. Amounts were checked against the transcription; compare the lines below with your original.'
+      : 'Read from a photo or scan with no transcription, so amounts could not be checked. Compare every line with your original.' });
+  }
+  const recipe = toRecipe(parsed.value, sourceText, starterHydration, flags);
 
-  if (opts.crossCheck !== false) {
-    const det = parseRecipeText(text, starterHydration).recipe;
+  if (opts.crossCheck !== false && sourceText.trim()) {
+    const det = parseRecipeText(sourceText, starterHydration).recipe;
     flags.push(...crossCheck(recipe, det));
   }
 
-  return { recipe, source: 'model', providerName: provider.name, flags, uncertainties: parsed.value.uncertainties };
+  return { recipe, source: 'model', providerName: provider.name, flags, uncertainties: parsed.value.uncertainties, transcript: hasImages ? parsed.value.transcript : undefined };
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +126,8 @@ export function validateReadRecipe(obj: unknown): Validated {
   if (!Array.isArray(obj.components) || obj.components.length === 0) return { ok: false, error: 'components must be a non-empty array' };
   if (!Array.isArray(obj.steps) || !obj.steps.every(s => typeof s === 'string')) return { ok: false, error: 'steps must be string[]' };
   if (!Array.isArray(obj.uncertainties) || !obj.uncertainties.every(s => typeof s === 'string')) return { ok: false, error: 'uncertainties must be string[]' };
+  if (obj.transcript === undefined) obj.transcript = '';
+  if (typeof obj.transcript !== 'string') return { ok: false, error: 'transcript must be a string' };
 
   for (const [ci, c] of obj.components.entries()) {
     if (!isObj(c)) return { ok: false, error: `component ${ci} is not an object` };

@@ -41,13 +41,15 @@ export interface ReadRecipe {
   steps: string[];
   /** Anything the model was unsure about, one line each. */
   uncertainties: string[];
+  /** For image or PDF input: the recipe text transcribed as it appears. Empty for text input. */
+  transcript: string;
 }
 
 /** JSON Schema for providers that support constrained output. */
 export const READ_RECIPE_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['title', 'language', 'components', 'steps', 'uncertainties'],
+  required: ['title', 'language', 'components', 'steps', 'uncertainties', 'transcript'],
   properties: {
     title: { type: ['string', 'null'] },
     language: { type: 'string', enum: ['en', 'es'] },
@@ -82,6 +84,7 @@ export const READ_RECIPE_JSON_SCHEMA = {
     },
     steps: { type: 'array', items: { type: 'string' } },
     uncertainties: { type: 'array', items: { type: 'string' } },
+    transcript: { type: 'string' },
   },
 } as const;
 
@@ -97,4 +100,6 @@ Rules:
 7. steps: copy the method steps verbatim, one string per step, in order. Do not shorten, merge, reword, or add steps. If there is no method, return an empty array.
 8. language: "es" if the recipe is mostly Spanish, else "en". Keep ingredient names in the recipe's own language.
 9. If something is ambiguous (a smudged number, a line you cannot read, two amounts for one ingredient), make your best reading AND add one line to uncertainties saying what you were unsure about. Otherwise uncertainties is an empty array.
-10. Return only the JSON object. No prose, no markdown fences.`;
+10. transcript: when the recipe arrives as an image or PDF, copy its text into transcript exactly as it appears, line by line, every ingredient line and every step, nothing added. When the recipe arrives as text, transcript is "".
+11. If the input is not a recipe, or no ingredient amounts can be read at all, return one component with no ingredients and explain in uncertainties.
+12. Return only the JSON object. No prose, no markdown fences.`;

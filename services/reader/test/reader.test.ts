@@ -35,7 +35,7 @@ const CUPS_READ: ReadRecipe = {
     ],
   }],
   steps: ['Mix and knead 10 minutes.', 'Rise 1 hour.', 'Shape and proof 45 minutes.', 'Bake at 375°F for 30 minutes.'],
-  uncertainties: [],
+  uncertainties: [], transcript: '',
 };
 
 describe('readRecipe with the model', () => {
@@ -78,7 +78,7 @@ describe('readRecipe with the model', () => {
           { amount: 1, unit: '', name: 'egg', note: 'beaten, for egg wash', role: 'egg', isReference: false, isFinishing: true },
         ] },
       ],
-      steps: [], uncertainties: [],
+      steps: [], uncertainties: [], transcript: '',
     };
     const text = 'Levain\n20g sourdough starter\n50g bread flour\n50g water\nDough\nall of the levain\n450g bread flour\n300g water\n10g salt\n1 egg, beaten, for egg wash';
     const r = await readRecipe(text, fake(JSON.stringify(read)));
@@ -161,5 +161,56 @@ describe('http handler', () => {
     expect((await post('/convert', { text: CUPS_TEXT, direction: 'sideways' })).status).toBe(400);
     expect((await post('/read', { text: '' })).status).toBe(400);
     expect((await h(new Request('https://x.test/read', { method: 'GET' }))).status).toBe(405);
+  });
+});
+
+describe('photo and scan input', () => {
+  const IMG = { data: 'AAAA', mediaType: 'image/jpeg' as const };
+  const read = {
+    title: 'Loaf', language: 'en',
+    components: [{ kind: 'dough', name: 'Dough', ingredients: [
+      { amount: 500, unit: 'g', name: 'bread flour', note: '', role: 'flour', isReference: false, isFinishing: false },
+      { amount: 350, unit: 'g', name: 'water', note: '', role: 'liquid', isReference: false, isFinishing: false },
+      { amount: 10, unit: 'g', name: 'salt', note: '', role: 'salt', isReference: false, isFinishing: false },
+      { amount: 7, unit: 'g', name: 'instant yeast', note: '', role: 'yeast', isReference: false, isFinishing: false },
+    ] }],
+    steps: ['Mix. Rise 1 hour. Bake 40 minutes.'], uncertainties: ['The yeast amount was smudged; read as 7g.'],
+    transcript: 'Loaf\n500g bread flour\n350g water\n10g salt\n7g instant yeast\nMix. Rise 1 hour. Bake 40 minutes.',
+  };
+
+  it('sends images to the provider and grounds amounts against the transcript', async () => {
+    let seen: any;
+    const p: Provider = { name: 'fake', async read(input) { seen = input; return JSON.stringify(read); } };
+    const r = await readRecipe({ images: [IMG] }, p);
+    expect(seen.images).toHaveLength(1);
+    expect(r.source).toBe('model');
+    expect(r.transcript).toMatch(/500g bread flour/);
+    expect(Math.round(analyze(r.recipe).hydration)).toBe(70);
+    expect(r.uncertainties[0]).toMatch(/smudged/);
+    expect(r.flags.some(f => /Read from a photo/.test(f.message))).toBe(true);
+    expect(r.flags.filter(f => f.level === 'warning')).toEqual([]);
+  });
+
+  it('flags an amount missing from the transcript and a parser disagreement', async () => {
+    const bad = structuredClone(read); bad.components[0]!.ingredients[1]!.amount = 420;
+    const r = await readRecipe({ images: [IMG] }, fake(JSON.stringify(bad)));
+    expect(r.flags.some(f => /not in the recipe text/.test(f.message))).toBe(true);
+    expect(r.flags.some(f => /disagree on liquid/.test(f.message))).toBe(true);
+  });
+
+  it('cannot read a photo without a provider, and says so', async () => {
+    const r = await readRecipe({ images: [IMG] }, null);
+    expect(r.recipe.components).toEqual([]);
+    expect(r.flags[0]).toMatchObject({ level: 'error' });
+    expect(r.flags[0]!.message).toMatch(/needs the AI reader/);
+  });
+
+  it('http: accepts images, rejects bad ones', async () => {
+    const h = handler({ provider: fake(JSON.stringify(read)) });
+    const post = (body: unknown) => h(new Request('https://x.test/read', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }));
+    expect((await post({ images: [IMG] })).status).toBe(200);
+    expect((await post({ images: [{ data: 'AAAA', mediaType: 'image/bmp' }] })).status).toBe(400);
+    expect((await post({ images: [IMG, IMG, IMG, IMG, IMG] })).status).toBe(413);
+    expect((await post({})).status).toBe(400);
   });
 });

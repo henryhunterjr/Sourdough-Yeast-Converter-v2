@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { analyze, convertToSourdough, convertToYeast, detectLanguage, renderRecipe, sanityCheck, type Conversion, type Recipe } from '@bgb/dough-core';
 import { readRecipe, type Flag, type ReadResult } from './api';
+import { prepareFile, type ImageInput } from './input';
 import { t, type Lang } from './i18n';
 import { EXAMPLES } from './examples';
 import { RecipeView } from './components/RecipeView';
@@ -22,6 +23,10 @@ export default function App() {
   const [dirChoice, setDirChoice] = useState<Direction | 'auto'>('auto');
   const [opts, setOpts] = useState<Options>(DEFAULT_OPTIONS);
   const [busy, setBusy] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [images, setImages] = useState<ImageInput[]>([]);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [read, setRead] = useState<ReadResult | null>(null);
   const [tab, setTab] = useState<'converted' | 'original'>('converted');
   const [sheet, setSheet] = useState(false);
@@ -32,20 +37,26 @@ export default function App() {
   const s = t(lang);
 
   useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    const shared = [q.get('title'), q.get('text'), q.get('url')].filter(Boolean).join('\n');
+    if (shared.trim()) { setText(shared); history.replaceState(null, '', '/'); }
+  }, []);
+
+  useEffect(() => {
     try { localStorage.setItem(KEY, JSON.stringify({ text, hydration, lang: langChoice })); } catch { /* private mode */ }
   }, [text, hydration, langChoice]);
 
   useEffect(() => { if (toast) { const id = setTimeout(() => setToast(null), 1800); return () => clearTimeout(id); } }, [toast]);
 
   const original: Recipe | null = read?.recipe ?? null;
-  const originalLeavening = original ? analyze(original).leavening : null;
+  const originalLeavening = original && original.components.length ? analyze(original).leavening : null;
   const direction: Direction = dirChoice !== 'auto' ? dirChoice : originalLeavening === 'sourdough' ? 'to-yeast' : 'to-sourdough';
 
-  const checks = original ? sanityCheck(original) : [];
+  const checks = original && original.components.length ? sanityCheck(original) : [];
   const blocked = checks.some(c => c.level === 'error');
 
   const conversion: Conversion | null = useMemo(() => {
-    if (!original || blocked) return null;
+    if (!original || !original.components.length || blocked) return null;
     try {
       return direction === 'to-sourdough'
         ? convertToSourdough(original, { prefermentedFlour: opts.prefermentedFlour, ...(opts.levainHydration === 'auto' ? {} : { levainHydration: opts.levainHydration }) })
@@ -53,18 +64,33 @@ export default function App() {
     } catch { return null; }
   }, [original, blocked, direction, opts]);
 
+  const canGo = !!text.trim() || images.length > 0;
+
+  async function addFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setPreparing(true);
+    try {
+      for (const f of Array.from(files).slice(0, 4)) {
+        const prep = await prepareFile(f);
+        if (prep.text) setText(t => (t.trim() ? t + '\n\n' : '') + prep.text);
+        if (prep.images) setImages(im => [...im, ...prep.images!].slice(0, 4));
+      }
+    } catch (e) { setToast((e as Error).message); }
+    finally { setPreparing(false); if (cameraRef.current) cameraRef.current.value = ''; if (fileRef.current) fileRef.current.value = ''; }
+  }
+
   async function go() {
-    if (!text.trim() || busy) return;
+    if (!canGo || busy) return;
     abort.current?.abort();
     const ac = new AbortController(); abort.current = ac;
     setBusy(true); setRead(null); setTab('converted');
     try {
-      const r = await readRecipe(text, hydration, ac.signal);
+      const r = await readRecipe({ text, images: images.map(i => ({ data: i.data, mediaType: i.mediaType })) }, hydration, ac.signal);
       if (!ac.signal.aborted) { setRead(r); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     } finally { if (!ac.signal.aborted) setBusy(false); }
   }
 
-  function clear() { abort.current?.abort(); setRead(null); setText(''); setBusy(false); setDirChoice('auto'); }
+  function clear() { abort.current?.abort(); setRead(null); setText(''); setImages([]); setBusy(false); setDirChoice('auto'); }
 
   const outputText = () => {
     const r = tab === 'converted' && conversion ? conversion.recipe : original;
@@ -107,10 +133,23 @@ export default function App() {
             <section className="card">
               <h2>{s.paste}</h2>
               <textarea className="paste" value={text} onChange={e => setText(e.target.value)} placeholder={s.pastePlaceholder} spellCheck={false} autoCapitalize="off" />
-              {!text.trim() && (
+              <div className="attach-row">
+                <button className="btn secondary" onClick={() => cameraRef.current?.click()} disabled={preparing}>📷 {s.takePhoto}</button>
+                <button className="btn secondary" onClick={() => fileRef.current?.click()} disabled={preparing}>{preparing ? <><span className="spinner" />{s.preparing}</> : <>📎 {s.upload}</>}</button>
+                <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={e => addFiles(e.target.files)} />
+                <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple hidden onChange={e => addFiles(e.target.files)} />
+              </div>
+              {images.length > 0 && (
+                <div className="thumbs">
+                  {images.map((im, i) => (
+                    <div className="thumb" key={i}><img src={im.preview} alt={im.name} /><button aria-label={s.remove} onClick={() => setImages(x => x.filter((_, j) => j !== i))}>×</button></div>
+                  ))}
+                </div>
+              )}
+              {!text.trim() && images.length === 0 && (
                 <div className="empty">
                   <p><b>{s.noRecipe}</b></p>
-                  <p>{s.noRecipeHint}</p>
+                  <p>{s.noRecipeHint} {s.orDrop}</p>
                   <div className="examples">
                     <button className="chip" onClick={() => setText(EXAMPLES.lean)}>{s.tryLean}</button>
                     <button className="chip" onClick={() => setText(EXAMPLES.enriched)}>{s.tryEnriched}</button>
@@ -141,7 +180,16 @@ export default function App() {
           </>
         )}
 
-        {read && original && (
+        {read && original && original.components.length === 0 && (
+          <section className="card">
+            {flags.map((f, i) => <div className={`flag ${f.level}`} key={i}><span className="dot" /><div>{f.message}</div></div>)}
+            {read.transcript && (
+              <details className="transcript"><summary>{s.transcript}</summary><p>{s.transcriptHint}</p><pre className="plain">{read.transcript}</pre></details>
+            )}
+          </section>
+        )}
+
+        {read && original && original.components.length > 0 && (
           <>
             <section className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -156,6 +204,9 @@ export default function App() {
                 </div>
               )}
               {blocked && <div className="flag error" style={{ marginTop: 8 }}><span className="dot" /><div>{s.sanityFail}</div></div>}
+              {read.transcript && (
+                <details className="transcript"><summary>{s.transcript}</summary><p>{s.transcriptHint}</p><pre className="plain">{read.transcript}</pre></details>
+              )}
             </section>
 
             <div className="seg block" style={{ marginBottom: 10 }}>
@@ -201,17 +252,19 @@ export default function App() {
         <div className="inner">
           {!read ? (
             <>
-              {text.trim() && <button className="btn secondary" onClick={clear}>{s.clear}</button>}
-              <button className="btn" onClick={go} disabled={!text.trim() || busy}>
+              {canGo && <button className="btn secondary" onClick={clear}>{s.clear}</button>}
+              <button className="btn primary-wide" onClick={go} disabled={!canGo || busy || preparing}>
                 {busy ? <><span className="spinner" />{s.reading}</> : s.convert}
               </button>
             </>
           ) : (
             <>
               <button className="btn secondary" onClick={clear}>{s.clear}</button>
+              {original && original.components.length > 0 && <>
               <button className="btn secondary" onClick={() => setSheet(true)}>{s.options}</button>
               <button className="btn secondary" onClick={copy}>{s.copy}</button>
               <button className="btn primary-wide" onClick={share}>{s.share}</button>
+              </>}
             </>
           )}
         </div>

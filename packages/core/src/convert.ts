@@ -2,6 +2,7 @@
  * The two conversions. Pure functions: recipe in, recipe out, plus notes.
  * All arithmetic is exact; rounding happens only in format.ts.
  */
+import { ROUND } from './units.js';
 import { analyze, resolveFractions, starterFlourFraction, starterWaterFraction } from './analyze.js';
 import type { Component, Ingredient, Recipe, YeastKind } from './model.js';
 import { editMethodToSourdough, editMethodToYeast } from './method.js';
@@ -106,7 +107,6 @@ export function convertToSourdough(input: Recipe, opts: ToSourdoughOptions = {})
     });
   }
 
-  const levainTotal = seed + addFlour + addWater;
   const levain: Component = {
     kind: 'preferment',
     name: 'Levain',
@@ -116,6 +116,9 @@ export function convertToSourdough(input: Recipe, opts: ToSourdoughOptions = {})
       { name: recipe.language === 'es' ? 'agua' : 'water', grams: addWater, role: 'liquid' },
     ] as Ingredient[]).filter(i => i.grams > 0.25),
   };
+  // The total is the sum of the lines as the baker will see them (whole grams),
+  // so "36g + 71g + 27g" always adds up to the figure shown.
+  const levainTotal = levain.ingredients.reduce((a, i) => a + ROUND.grams(i.grams), 0);
   const mainDough = dough[0];
   if (!mainDough) throw new Error('No dough component found.');
   mainDough.ingredients.unshift({

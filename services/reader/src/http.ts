@@ -8,7 +8,9 @@
  */
 import { analyze, convertToSourdough, convertToYeast, sanityCheck, type Recipe } from '@bgb/dough-core';
 import { readRecipe } from './reader.js';
-import { providerFromEnv, type Provider } from './providers.js';
+import { providerFromEnv, type Provider, type ReadInput, type ReadImage } from './providers.js';
+
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 export interface HandlerOptions {
   provider?: Provider | null;
@@ -16,12 +18,17 @@ export interface HandlerOptions {
   allowOrigin?: string;
   /** Hard cap on pasted text, in characters. Default 20,000. */
   maxChars?: number;
+  /** Max images per request and max base64 characters per image. Defaults 4 and 6,000,000 (~4.5MB). */
+  maxImages?: number;
+  maxImageChars?: number;
 }
 
 export function handler(opts: HandlerOptions = {}) {
   const provider = opts.provider === undefined ? providerFromEnv() : opts.provider;
   const origin = opts.allowOrigin ?? '*';
   const maxChars = opts.maxChars ?? 20_000;
+  const maxImages = opts.maxImages ?? 4;
+  const maxImageChars = opts.maxImageChars ?? 6_000_000;
   const cors = {
     'access-control-allow-origin': origin,
     'access-control-allow-headers': 'content-type',
@@ -39,11 +46,27 @@ export function handler(opts: HandlerOptions = {}) {
 
     const starterHydration = clampHydration(body.starterHydration);
 
-    if (path.endsWith('/read')) {
+    const pickInput = (): ReadInput | { error: string; status: number } => {
       const text = typeof body.text === 'string' ? body.text : '';
-      if (!text.trim()) return json({ error: 'text is required' }, 400);
-      if (text.length > maxChars) return json({ error: `text is over ${maxChars} characters` }, 413);
-      const result = await readRecipe(text, provider, { starterHydration });
+      if (text.length > maxChars) return { error: `text is over ${maxChars} characters`, status: 413 };
+      const images: ReadImage[] = [];
+      if (body.images !== undefined) {
+        if (!Array.isArray(body.images)) return { error: 'images must be an array', status: 400 };
+        if (body.images.length > maxImages) return { error: `at most ${maxImages} images`, status: 413 };
+        for (const im of body.images) {
+          if (!im || typeof im.data !== 'string' || !IMAGE_TYPES.has(im.mediaType)) return { error: 'each image needs base64 data and a mediaType of image/jpeg, image/png, image/webp or image/gif', status: 400 };
+          if (im.data.length > maxImageChars) return { error: 'image too large', status: 413 };
+          images.push({ data: im.data, mediaType: im.mediaType });
+        }
+      }
+      if (!text.trim() && images.length === 0) return { error: 'text or images is required', status: 400 };
+      return { text, images };
+    };
+
+    if (path.endsWith('/read')) {
+      const input = pickInput();
+      if ('error' in input) return json({ error: input.error }, input.status);
+      const result = await readRecipe(input, provider, { starterHydration });
       return json(result);
     }
 
@@ -55,12 +78,11 @@ export function handler(opts: HandlerOptions = {}) {
       if (body.recipe) {
         recipe = body.recipe as Recipe;
         recipe.starterHydration = starterHydration;
-      } else if (typeof body.text === 'string' && body.text.trim()) {
-        if (body.text.length > maxChars) return json({ error: `text is over ${maxChars} characters` }, 413);
-        read = await readRecipe(body.text, provider, { starterHydration });
-        recipe = read.recipe;
       } else {
-        return json({ error: 'text or recipe is required' }, 400);
+        const input = pickInput();
+        if ('error' in input) return json({ error: input.error }, input.status);
+        read = await readRecipe(input, provider, { starterHydration });
+        recipe = read.recipe;
       }
       const checks = sanityCheck(recipe);
       if (checks.some(c => c.level === 'error')) return json({ read, checks, error: 'Recipe failed sanity checks' }, 422);

@@ -5,12 +5,18 @@
  */
 import { READ_RECIPE_JSON_SCHEMA, SYSTEM_PROMPT } from './schema.js';
 
+export interface ReadImage { data: string; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' }
+export interface ReadInput { text?: string; images?: ReadImage[] }
+
 export interface Provider {
   name: string;
-  read(text: string): Promise<string>;
+  read(input: ReadInput): Promise<string>;
 }
 
-const userMessage = (text: string) => `Read this recipe and return the JSON object.\n\n<recipe>\n${text}\n</recipe>`;
+const userText = (input: ReadInput) =>
+  input.images?.length
+    ? `Read the recipe in ${input.images.length > 1 ? 'these images' : 'this image'} and return the JSON object. Transcribe the text faithfully into "transcript".${input.text ? `\n\nAdditional text:\n${input.text}` : ''}`
+    : `Read this recipe and return the JSON object.\n\n<recipe>\n${input.text ?? ''}\n</recipe>`;
 
 /** Anthropic Messages API with constrained JSON output. */
 export function anthropicProvider(opts: { apiKey: string; model?: string; fetchImpl?: typeof fetch } ): Provider {
@@ -18,7 +24,9 @@ export function anthropicProvider(opts: { apiKey: string; model?: string; fetchI
   const f = opts.fetchImpl ?? fetch;
   return {
     name: `anthropic:${model}`,
-    async read(text) {
+    async read(input) {
+      const content: unknown[] = (input.images ?? []).map(im => ({ type: 'image', source: { type: 'base64', media_type: im.mediaType, data: im.data } }));
+      content.push({ type: 'text', text: userText(input) });
       const res = await f('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -31,7 +39,7 @@ export function anthropicProvider(opts: { apiKey: string; model?: string; fetchI
           max_tokens: 4096,
           temperature: 0,
           system: SYSTEM_PROMPT,
-          messages: [{ role: 'user', content: userMessage(text) }],
+          messages: [{ role: 'user', content }],
           output_config: { format: { type: 'json_schema', schema: READ_RECIPE_JSON_SCHEMA } },
         }),
       });
@@ -50,14 +58,16 @@ export function geminiProvider(opts: { apiKey: string; model?: string; fetchImpl
   const f = opts.fetchImpl ?? fetch;
   return {
     name: `gemini:${model}`,
-    async read(text) {
+    async read(input) {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      const parts: unknown[] = (input.images ?? []).map(im => ({ inlineData: { mimeType: im.mediaType, data: im.data } }));
+      parts.push({ text: userText(input) });
       const res = await f(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-goog-api-key': opts.apiKey },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{ role: 'user', parts: [{ text: userMessage(text) }] }],
+          contents: [{ role: 'user', parts }],
           generationConfig: {
             temperature: 0,
             responseMimeType: 'application/json',
