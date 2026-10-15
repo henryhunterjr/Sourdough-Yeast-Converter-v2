@@ -158,6 +158,7 @@ function isObj(x: unknown): x is Record<string, any> {
 /** Build the engine's Recipe from the model's reading. All grams come from dough-core. */
 export function toRecipe(read: ReadRecipe, sourceText: string, starterHydration: number, flags: Flag[]): Recipe {
   const components: Component[] = [];
+  const dropped: string[] = [];
   let finishing: Component | null = null;
 
   for (const c of read.components) {
@@ -172,6 +173,8 @@ export function toRecipe(read: ReadRecipe, sourceText: string, starterHydration:
       }
       comp.ingredients.push(ing);
     }
+    // A section with nothing in it ("For the pan" lifted from the method) is noise, not a component.
+    if (comp.ingredients.length === 0) { dropped.push(c.name); continue; }
     components.push(comp);
   }
   if (finishing) components.push(finishing);
@@ -180,6 +183,9 @@ export function toRecipe(read: ReadRecipe, sourceText: string, starterHydration:
     const first = components.find(c => c.ingredients.length > 0);
     if (first) { first.kind = 'dough'; flags.push({ level: 'info', message: `No section was marked as the dough; treating "${first.name}" as the dough.` }); }
   }
+
+  // Any model note about a section we dropped goes with it.
+  if (dropped.length) read.uncertainties = read.uncertainties.filter(u => !dropped.some(d => u.toLowerCase().includes(d.toLowerCase())));
 
   return {
     title: read.title ?? undefined,
@@ -222,7 +228,7 @@ function toIngredient(ri: ReadIngredient, comp: { name: string; kind: string }, 
     flags.push({ level: 'warning', message: `The reader reported ${ri.amount} ${ri.unit} ${ri.name}, but that number is not in the recipe text. Check it.`, where });
   }
 
-  const ing: Ingredient = { name, grams, role, original: { amount: ri.amount, unit: ri.unit, text: `${ri.amount} ${ri.unit} ${ri.name}`.trim() } };
+  const ing: Ingredient = { name, grams, role, original: { amount: ri.amount, unit: ri.unit, text: originalLine(ri, sourceText) } };
   if (cls.yeastKind) ing.yeastKind = cls.yeastKind;
   return ing;
 }
@@ -275,6 +281,33 @@ export function amountAppearsInText(amount: number, text: string): boolean {
     if (Math.abs(Number(k) - frac) < 0.01) for (const f of forms) candidates.add(whole ? `${whole} ${f}` : f).add(whole ? `${whole}${f}` : f);
   }
   return [...candidates].some(c => c && standalone(c));
+}
+
+/**
+ * The line as the baker wrote it, for display under the gram amount. Prefer the
+ * actual source line; otherwise rebuild it with baker's fractions and the prep note.
+ */
+export function originalLine(ri: ReadIngredient, sourceText: string): string {
+  const key = cleanName(ri.name).toLowerCase().split(/\s+/).filter(w => w.length > 2).pop() ?? '';
+  if (key && ri.amount !== null) {
+    for (const raw of sourceText.split(/\r?\n/)) {
+      const line = raw.replace(/^[\s\-•*·]+/, '').trim();
+      if (line.toLowerCase().includes(key) && amountAppearsInText(ri.amount, line)) return line;
+    }
+  }
+  const parts = [ri.amount === null ? '' : formatAmount(ri.amount), ri.unit, ri.name].filter(Boolean).join(' ').trim();
+  return ri.note ? `${parts}, ${ri.note}` : parts;
+}
+
+const FRACTIONS: Array<[number, string]> = [[0.125, '1/8'], [0.25, '1/4'], [0.333, '1/3'], [0.375, '3/8'], [0.5, '1/2'], [0.625, '5/8'], [0.667, '2/3'], [0.75, '3/4'], [0.875, '7/8']];
+
+/** 3.5 -> "3 1/2", 0.25 -> "1/4", 2 -> "2", 1.3 -> "1.3". */
+export function formatAmount(n: number): string {
+  const whole = Math.floor(n), frac = n - whole;
+  if (frac < 0.01) return String(whole);
+  const hit = FRACTIONS.find(([v]) => Math.abs(v - frac) < 0.02);
+  if (!hit) return String(Math.round(n * 100) / 100);
+  return whole ? `${whole} ${hit[1]}` : hit[1];
 }
 
 // ---------------------------------------------------------------------------

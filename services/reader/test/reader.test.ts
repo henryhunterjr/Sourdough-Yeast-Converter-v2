@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyze } from '@bgb/dough-core';
-import { readRecipe, validateReadRecipe, amountAppearsInText, handler, type Provider } from '../src/index.js';
+import { readRecipe, validateReadRecipe, amountAppearsInText, originalLine, formatAmount, handler, type Provider } from '../src/index.js';
 import type { ReadRecipe } from '../src/schema.js';
 
 const fake = (answer: string | (() => string)): Provider => ({
@@ -212,5 +212,63 @@ describe('photo and scan input', () => {
     expect((await post({ images: [{ data: 'AAAA', mediaType: 'image/bmp' }] })).status).toBe(400);
     expect((await post({ images: [IMG, IMG, IMG, IMG, IMG] })).status).toBe(413);
     expect((await post({})).status).toBe(400);
+  });
+});
+
+describe('display parity with the built-in parser (work order: AI reader cleanup)', () => {
+  const withPan = structuredClone(CUPS_READ);
+  withPan.components.push({ kind: 'other', name: 'For the pan', ingredients: [] });
+  withPan.uncertainties = ['"For the pan" may be a transcription artifact.'];
+
+  it('hides a section with no ingredients', async () => {
+    const r = await readRecipe(CUPS_TEXT, fake(JSON.stringify(withPan)));
+    expect(r.recipe.components.map(c => c.name)).toEqual(['Dough']);
+    expect(r.uncertainties).toEqual([]);
+  });
+
+  it('shows the recipe\'s own wording, fractions and prep notes included', async () => {
+    const r = await readRecipe(CUPS_TEXT, fake(JSON.stringify(withPan)));
+    const lines = r.recipe.components[0]!.ingredients.map(i => i.original!.text);
+    expect(lines).toContain('3 1/2 cups bread flour');
+    expect(lines).toContain('1 1/4 cups warm water');
+    expect(lines).toContain('2 tablespoons butter, softened');
+    expect(lines).toContain('1 1/2 teaspoons salt');
+    // Same lines the parser shows.
+    const det = await readRecipe(CUPS_TEXT, null);
+    expect(lines).toEqual(det.recipe.components[0]!.ingredients.map(i => i.original!.text));
+    // Numbers unchanged.
+    expect(r.recipe.components[0]!.ingredients.map(i => Math.round(i.grams))).toEqual(det.recipe.components[0]!.ingredients.map(i => Math.round(i.grams)));
+  });
+
+  it('rebuilds a line with baker\'s fractions and the note when the source line is not found', () => {
+    const ri = { amount: 3.5, unit: 'cups', name: 'bread flour', note: 'sifted', role: 'flour', isReference: false, isFinishing: false } as const;
+    expect(originalLine(ri, 'nothing here')).toBe('3 1/2 cups bread flour, sifted');
+    expect(formatAmount(0.25)).toBe('1/4');
+    expect(formatAmount(2.667)).toBe('2 2/3');
+    expect(formatAmount(2)).toBe('2');
+    expect(formatAmount(1.3)).toBe('1.3');
+  });
+
+  it('holds for the cinnamon rolls and the Spanish loaf: AI and parser show the same lines', async () => {
+    const { parseRecipeText } = await import('@bgb/dough-core');
+    const rolls = `Cinnamon Rolls\n\nDough\n4 cups (500g) all-purpose flour\n1 cup (240g) whole milk, warm\n1/3 cup (67g) sugar\n1 large egg\n1/3 cup (75g) butter, melted\n1 teaspoon salt\n2 1/4 teaspoons instant yeast\n\nFilling\n1/2 cup (113g) butter, softened\n3/4 cup (150g) brown sugar\n2 tablespoons cinnamon\n\nMethod\n1. Mix. Rise 1 1/2 hours.\n2. Bake at 350°F for 25 minutes.`;
+    const es = `Pan de masa madre\n\nLevain\n20g masa madre activa\n50g harina de fuerza\n50g agua\n\nMasa\ntodo el levain\n450g harina de fuerza\n300g agua\n10g sal\n\nMétodo\n1. Forma y deja levar 2 horas.`;
+    // Build the "AI reading" from the parser's own output so the only variable is the display path.
+    const fromParser = (text: string, lang: 'en' | 'es'): ReadRecipe => {
+      const p = parseRecipeText(text, 100).recipe;
+      return {
+        title: p.title ?? null, language: lang, transcript: '', uncertainties: [],
+        steps: p.steps.map(s => s.text),
+        components: p.components.map(c => ({ kind: c.kind, name: c.name, ingredients: c.ingredients.map(i => ({
+          amount: i.isReference ? null : (i.original?.amount ?? i.grams), unit: i.isReference ? '' : (i.original?.unit ?? 'g'), name: i.name, note: '', role: i.role, isReference: !!i.isReference, isFinishing: false,
+        })) })),
+      };
+    };
+    for (const [text, lang] of [[rolls, 'en'], [es, 'es']] as const) {
+      const ai = await readRecipe(text, fake(JSON.stringify(fromParser(text, lang))));
+      const det = await readRecipe(text, null);
+      const show = (r: typeof ai) => r.recipe.components.map(c => [c.name, ...c.ingredients.map(i => `${Math.round(i.grams)} ${i.original?.text ?? i.name}`)]);
+      expect(show(ai)).toEqual(show(det));
+    }
   });
 });

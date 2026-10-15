@@ -1,4 +1,4 @@
-export { readRecipe, parseModelJson, validateReadRecipe, toRecipe, amountAppearsInText } from './reader.js';
+export { readRecipe, parseModelJson, validateReadRecipe, toRecipe, amountAppearsInText, originalLine, formatAmount } from './reader.js';
 export type { ReadResult, ReadOptions, Flag } from './reader.js';
 export { anthropicProvider, geminiProvider, providerFromEnv, ProviderError } from './providers.js';
 export type { Provider, ReadInput, ReadImage } from './providers.js';
