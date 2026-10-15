@@ -6,6 +6,7 @@ import { t, type Lang } from './i18n';
 import { EXAMPLES } from './examples';
 import { RecipeView } from './components/RecipeView';
 import { OptionsSheet, DEFAULT_OPTIONS, type Options } from './components/OptionsSheet';
+import { Icon } from './components/Icon';
 
 type Direction = 'to-sourdough' | 'to-yeast';
 
@@ -91,6 +92,7 @@ export default function App() {
   }
 
   function clear() { abort.current?.abort(); setRead(null); setText(''); setImages([]); setBusy(false); setDirChoice('auto'); }
+  function editRecipe() { abort.current?.abort(); setRead(null); setBusy(false); }
 
   const outputText = () => {
     const r = tab === 'converted' && conversion ? conversion.recipe : original;
@@ -115,11 +117,13 @@ export default function App() {
   const problems = flags.filter(f => f.level !== 'info');
 
   return (
-    <div className="app">
+    <div className="app" lang={lang}>
+      <a className="skip-link" href="#workspace">{s.paste}</a>
       <header className="topbar">
         <div className="brand">
-          <img className="logo" src="/icon.svg" alt="" />
-          <div><h1>{s.shortName}</h1><small>{s.tagline}</small></div>
+          <div className="brand-name">{s.academy}</div>
+          <span className="brand-divider" />
+          <span className="brand-tool">{s.shortName}</span>
         </div>
         <div className="seg" aria-label="Language">
           <button aria-pressed={lang === 'en'} onClick={() => setLangChoice('en')}>EN</button>
@@ -127,15 +131,22 @@ export default function App() {
         </div>
       </header>
 
-      <main className="main">
+      <main id="workspace" tabIndex={-1} className={`main ${read ? 'results-layout' : 'input-layout'}`}>
+        <section className="intro">
+          <p className="tool-name"><Icon name="swap" />{s.toolName}</p>
+          <h1>{read ? s.resultTitle : s.heroTitle}</h1>
+          <p className="intro-copy">{read ? s.resultIntro : s.heroIntro}</p>
+          {!read && <div className="intro-note"><span className="check-seal"><Icon name="check" /></span><p>{s.heroDetail}</p></div>}
+        </section>
         {!read && (
           <>
-            <section className="card">
-              <h2>{s.paste}</h2>
-              <textarea className="paste" value={text} onChange={e => setText(e.target.value)} placeholder={s.pastePlaceholder} spellCheck={false} autoCapitalize="off" />
+            <section className="card recipe-input" aria-busy={busy || preparing}>
+              <div className="card-heading"><h2><label htmlFor="recipe-text">{s.paste}</label></h2><span>{s.inputFormats}</span></div>
+              <textarea id="recipe-text" className="paste" aria-describedby="recipe-help" value={text} onChange={e => setText(e.target.value)} placeholder={s.pastePlaceholder} spellCheck={false} autoCapitalize="off" />
+              <p id="recipe-help" className="input-help">{s.inputHelp}</p>
               <div className="attach-row">
-                <button className="btn secondary" onClick={() => cameraRef.current?.click()} disabled={preparing}>📷 {s.takePhoto}</button>
-                <button className="btn secondary" onClick={() => fileRef.current?.click()} disabled={preparing}>{preparing ? <><span className="spinner" />{s.preparing}</> : <>📎 {s.upload}</>}</button>
+                <button className="btn secondary" onClick={() => cameraRef.current?.click()} disabled={preparing}><Icon name="camera" />{s.takePhoto}</button>
+                <button className="btn secondary" onClick={() => fileRef.current?.click()} disabled={preparing}>{preparing ? <><span className="spinner" />{s.preparing}</> : <><Icon name="upload" />{s.upload}</>}</button>
                 <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={e => addFiles(e.target.files)} />
                 <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple hidden onChange={e => addFiles(e.target.files)} />
               </div>
@@ -148,17 +159,18 @@ export default function App() {
               )}
               {!text.trim() && images.length === 0 && (
                 <div className="empty">
-                  <p><b>{s.noRecipe}</b></p>
-                  <p>{s.noRecipeHint} {s.orDrop}</p>
+                  <p>{s.startWithSample}</p>
                   <div className="examples">
                     <button className="chip" onClick={() => setText(EXAMPLES.lean)}>{s.tryLean}</button>
                     <button className="chip" onClick={() => setText(EXAMPLES.enriched)}>{s.tryEnriched}</button>
-                    <button className="chip" onClick={() => { setText(EXAMPLES.spanish); setLangChoice(null); }}>{s.trySpanish}</button>
+                    <button className="chip" onClick={() => { setText(lang === 'es' ? EXAMPLES.lean : EXAMPLES.spanish); setLangChoice(null); }}>{s.trySpanish}</button>
                   </div>
                 </div>
               )}
+              {busy && <div className="reading-state" role="status"><span className="spinner" /><div><b>{s.reading}</b><p>{s.readingHint}</p></div></div>}
             </section>
-            <section className="card">
+            <section className="card setup-card">
+              <h2>{s.setupTitle}</h2>
               <div className="row">
                 <label>{s.direction}</label>
                 <div className="seg">
@@ -170,9 +182,9 @@ export default function App() {
               <div className="row">
                 <label>{s.starterHydration}<span className="hint">{s.starterHint}</span></label>
                 <div className="stepper">
-                  <button onClick={() => setHydration(h => Math.max(50, h - 10))} aria-label="less">−</button>
+                  <button onClick={() => setHydration(h => Math.max(50, h - 10))} aria-label={`${s.decrease} ${s.starterHydration}`}>−</button>
                   <output>{hydration}%</output>
-                  <button onClick={() => setHydration(h => Math.min(150, h + 10))} aria-label="more">+</button>
+                  <button onClick={() => setHydration(h => Math.min(150, h + 10))} aria-label={`${s.increase} ${s.starterHydration}`}>+</button>
                 </div>
               </div>
             </section>
@@ -181,17 +193,19 @@ export default function App() {
         )}
 
         {read && original && original.components.length === 0 && (
-          <section className="card">
+          <section className="card error-card" role="alert">
+            <h2>{s.readErrorTitle}</h2><p className="error-hint">{s.readErrorHint}</p>
             {flags.map((f, i) => <div className={`flag ${f.level}`} key={i}><span className="dot" /><div>{f.message}</div></div>)}
             {read.transcript && (
               <details className="transcript"><summary>{s.transcript}</summary><p>{s.transcriptHint}</p><pre className="plain">{read.transcript}</pre></details>
             )}
+            <button className="btn secondary" onClick={editRecipe}>{s.editRecipe}</button>
           </section>
         )}
 
         {read && original && original.components.length > 0 && (
           <>
-            <section className="card">
+            <section className="card reader-status" aria-label={s.reading}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span className={`badge ${read.source === 'model' ? 'ok' : 'neutral'}`}>{read.source === 'model' ? s.readByModel : s.readByParser}</span>
                 <span className={`badge ${problems.length ? 'warn' : 'ok'}`}>{problems.length ? `${s.checkThese} (${problems.length})` : s.allClear}</span>
@@ -220,10 +234,10 @@ export default function App() {
               </div>
             )}
 
-            <section className="card">
+            <section className="card recipe-result">
               {tab === 'converted' && conversion ? (
                 <>
-                  {original.title && <h3 style={{ fontSize: 20, marginBottom: 10 }}>{original.title}</h3>}
+                  {original.title && <h2 className="recipe-title">{original.title}</h2>}
                   {conversion.levain && (
                     <div className="flag info" style={{ marginBottom: 12 }}><span className="dot" /><div>
                       <b>{s.levainBuild}:</b> {Math.round(conversion.levain.seed)}g starter + {Math.round(conversion.levain.flour)}g flour + {Math.round(conversion.levain.water)}g water = {Math.round(conversion.levain.total)}g ({conversion.levain.hydration}%, {conversion.levain.prefermentedFlourPct}% PFF)
@@ -238,7 +252,7 @@ export default function App() {
                 </>
               ) : (
                 <>
-                  {original.title && <h3 style={{ fontSize: 20, marginBottom: 10 }}>{original.title}</h3>}
+                  {original.title && <h2 className="recipe-title">{original.title}</h2>}
                   <RecipeView recipe={original} s={s} />
                 </>
               )}
@@ -252,18 +266,19 @@ export default function App() {
         <div className="inner">
           {!read ? (
             <>
+              <span className="dock-note">{s.readyHint}</span>
               {canGo && <button className="btn secondary" onClick={clear}>{s.clear}</button>}
               <button className="btn primary-wide" onClick={go} disabled={!canGo || busy || preparing}>
-                {busy ? <><span className="spinner" />{s.reading}</> : s.convert}
+                {busy ? <><span className="spinner" />{s.reading}</> : <>{s.convert}<Icon name="arrow" /></>}
               </button>
             </>
           ) : (
             <>
               <button className="btn secondary" onClick={clear}>{s.clear}</button>
               {original && original.components.length > 0 && <>
-              <button className="btn secondary" onClick={() => setSheet(true)}>{s.options}</button>
-              <button className="btn secondary" onClick={copy}>{s.copy}</button>
-              <button className="btn primary-wide" onClick={share}>{s.share}</button>
+              <button className="btn secondary" onClick={() => setSheet(true)}><Icon name="tune" />{s.options}</button>
+              <button className="btn secondary" onClick={copy}><Icon name="copy" />{s.copy}</button>
+              <button className="btn primary-wide" onClick={share}><Icon name="share" />{s.share}</button>
               </>}
             </>
           )}
@@ -273,7 +288,7 @@ export default function App() {
       {read && (
         <OptionsSheet open={sheet} onClose={() => setSheet(false)} direction={direction} opts={opts} setOpts={setOpts} s={s} />
       )}
-      {toast && <div className="toast">{toast}</div>}
+      {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   );
 }
