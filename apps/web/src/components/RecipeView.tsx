@@ -22,7 +22,7 @@ export function RecipeView({ recipe, s, highlightChanges }: { recipe: Recipe; s:
   return (
     <>
       <Stats a={a} s={s} />
-      {recipe.components.map((c, i) => (
+      {recipe.components.filter(c => c.ingredients.length > 0).map((c, i) => (
         <div className="section" key={i}>
           <h3>{c.name}<span className="kind">{s.kinds[c.kind]}</span></h3>
           <div>
@@ -31,7 +31,7 @@ export function RecipeView({ recipe, s, highlightChanges }: { recipe: Recipe; s:
                 <div className="g">{g(ing.grams)}</div>
                 <div className="n">
                   {ing.name}{ing.isReference && <span className="o">{s.ref}</span>}
-                  {ing.original && ing.original.unit && !/^g$/i.test(ing.original.unit) && (
+                  {ing.original && (
                     <span className="o">{ing.original.text}</span>
                   )}
                 </div>

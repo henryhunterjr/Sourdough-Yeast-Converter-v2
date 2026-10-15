@@ -13,7 +13,7 @@
  *      labelled as such.
  */
 import {
-  parseRecipeText, toGrams, classify, cleanName,
+  parseRecipeText, parseAmount, toGrams, classify, cleanName,
   type Recipe, type Component, type Ingredient, type Role, type ComponentKind,
 } from '@bgb/dough-core';
 import { COMPONENT_KINDS, ROLES, type ReadRecipe, type ReadIngredient } from './schema.js';
@@ -101,7 +101,19 @@ export async function readRecipe(input: string | ReadInput, provider: Provider |
     flags.push(...crossCheck(recipe, det));
   }
 
-  return { recipe, source: 'model', providerName: provider.name, flags, uncertainties: parsed.value.uncertainties, transcript: hasImages ? parsed.value.transcript : undefined };
+  const populatedNames = new Set(parsed.value.components.filter(c => c.ingredients.length > 0).map(c => c.name.toLowerCase()));
+  const emptyNames = parsed.value.components.filter(c => c.ingredients.length === 0 && !populatedNames.has(c.name.toLowerCase())).map(c => c.name);
+  const uncertainties = parsed.value.uncertainties.filter(u => !isEmptySectionNote(u, emptyNames));
+  return { recipe, source: 'model', providerName: provider.name, flags, uncertainties, transcript: hasImages ? parsed.value.transcript : undefined };
+}
+
+/** Only discard a note wholly about an empty/transcribed section. Keep mixed warnings. */
+function isEmptySectionNote(note: string, names: string[]): boolean {
+  return names.some(name => {
+    if (!name.trim()) return false;
+    const escaped = name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^["'“‘]?${escaped}["'”’]?\\s+(?:(?:section|component)\\s+)?(?:is|was|has|contains|may be|appears to be)\\s+(?:(?:an?|possibly|only)\\s+)*(?:empty|no ingredients|(?:empty\\s+)?transcription artifact)[.!]?$`, 'i').test(note.trim());
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -158,13 +170,13 @@ function isObj(x: unknown): x is Record<string, any> {
 /** Build the engine's Recipe from the model's reading. All grams come from dough-core. */
 export function toRecipe(read: ReadRecipe, sourceText: string, starterHydration: number, flags: Flag[]): Recipe {
   const components: Component[] = [];
-  const dropped: string[] = [];
+  const usedSourceLines = new Set<number>();
   let finishing: Component | null = null;
 
   for (const c of read.components) {
     const comp: Component = { kind: c.kind as ComponentKind, name: c.name, ingredients: [] };
     for (const ri of c.ingredients) {
-      const ing = toIngredient(ri, c, read.components, sourceText, flags);
+      const ing = toIngredient(ri, c, read.components, sourceText, flags, usedSourceLines);
       if (!ing) continue;
       if (ri.isFinishing && (c.kind === 'dough' || c.kind === 'preferment' || c.kind === 'tangzhong' || c.kind === 'soaker')) {
         if (!finishing) finishing = { kind: 'topping', name: read.language === 'es' ? 'Para terminar' : 'Finishing', ingredients: [] };
@@ -174,7 +186,7 @@ export function toRecipe(read: ReadRecipe, sourceText: string, starterHydration:
       comp.ingredients.push(ing);
     }
     // A section with nothing in it ("For the pan" lifted from the method) is noise, not a component.
-    if (comp.ingredients.length === 0) { dropped.push(c.name); continue; }
+    if (comp.ingredients.length === 0) continue;
     components.push(comp);
   }
   if (finishing) components.push(finishing);
@@ -183,9 +195,6 @@ export function toRecipe(read: ReadRecipe, sourceText: string, starterHydration:
     const first = components.find(c => c.ingredients.length > 0);
     if (first) { first.kind = 'dough'; flags.push({ level: 'info', message: `No section was marked as the dough; treating "${first.name}" as the dough.` }); }
   }
-
-  // Any model note about a section we dropped goes with it.
-  if (dropped.length) read.uncertainties = read.uncertainties.filter(u => !dropped.some(d => u.toLowerCase().includes(d.toLowerCase())));
 
   return {
     title: read.title ?? undefined,
@@ -196,7 +205,7 @@ export function toRecipe(read: ReadRecipe, sourceText: string, starterHydration:
   };
 }
 
-function toIngredient(ri: ReadIngredient, comp: { name: string; kind: string }, all: ReadRecipe['components'], sourceText: string, flags: Flag[]): Ingredient | null {
+function toIngredient(ri: ReadIngredient, comp: { name: string; kind: string }, all: ReadRecipe['components'], sourceText: string, flags: Flag[], usedSourceLines: Set<number>): Ingredient | null {
   const where = { component: comp.name, ingredient: ri.name };
   const name = cleanName(ri.name);
   const cls = classify(name);
@@ -228,7 +237,7 @@ function toIngredient(ri: ReadIngredient, comp: { name: string; kind: string }, 
     flags.push({ level: 'warning', message: `The reader reported ${ri.amount} ${ri.unit} ${ri.name}, but that number is not in the recipe text. Check it.`, where });
   }
 
-  const ing: Ingredient = { name, grams, role, original: { amount: ri.amount, unit: ri.unit, text: originalLine(ri, sourceText) } };
+  const ing: Ingredient = { name, grams, role, original: { amount: ri.amount, unit: ri.unit, text: originalLine(ri, sourceText, usedSourceLines) } };
   if (cls.yeastKind) ing.yeastKind = cls.yeastKind;
   return ing;
 }
@@ -287,26 +296,38 @@ export function amountAppearsInText(amount: number, text: string): boolean {
  * The line as the baker wrote it, for display under the gram amount. Prefer the
  * actual source line; otherwise rebuild it with baker's fractions and the prep note.
  */
-export function originalLine(ri: ReadIngredient, sourceText: string): string {
-  const key = cleanName(ri.name).toLowerCase().split(/\s+/).filter(w => w.length > 2).pop() ?? '';
-  if (key && ri.amount !== null) {
-    for (const raw of sourceText.split(/\r?\n/)) {
-      const line = raw.replace(/^[\s\-•*·]+/, '').trim();
-      if (line.toLowerCase().includes(key) && amountAppearsInText(ri.amount, line)) return line;
-    }
-  }
+export function originalLine(ri: ReadIngredient, sourceText: string, usedLines = new Set<number>()): string {
+  const nameKey = (name: string) => (cleanName(name).toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).join(' ');
+  const name = nameKey(ri.name);
+  const words = name.split(/\s+/).filter(Boolean);
+  const candidates = sourceText.split(/\r?\n/).flatMap((raw, index) => {
+    if (usedLines.has(index) || ri.amount === null) return [];
+    const line = raw.trim();
+    if (/^(?:[-•*·]\s*)?\d+[.)]\s/.test(line)) return []; // A numbered method step is never an ingredient line.
+    const parsed = parseAmount(line);
+    // Match the ingredient's amount AND unit, not a number in a prep note or step.
+    if (!parsed || parsed.amount !== ri.amount || normalizeUnit(parsed.unit) !== normalizeUnit(ri.unit)) return [];
+    const sourceName = nameKey(parsed.name);
+    if (!words.length || !words.every(w => sourceName.split(/\s+/).includes(w))) return [];
+    const exact = sourceName === name ? 2 : 0;
+    const note = ri.note && line.toLowerCase().includes(ri.note.toLowerCase()) ? 1 : 0;
+    return [{ line, index, score: exact + note }];
+  }).sort((a, b) => b.score - a.score);
+  const match = candidates[0];
+  if (match) { usedLines.add(match.index); return match.line; }
   const parts = [ri.amount === null ? '' : formatAmount(ri.amount), ri.unit, ri.name].filter(Boolean).join(' ').trim();
   return ri.note ? `${parts}, ${ri.note}` : parts;
 }
 
-const FRACTIONS: Array<[number, string]> = [[0.125, '1/8'], [0.25, '1/4'], [0.333, '1/3'], [0.375, '3/8'], [0.5, '1/2'], [0.625, '5/8'], [0.667, '2/3'], [0.75, '3/4'], [0.875, '7/8']];
+const FRACTIONS: Array<[number, string]> = [[1 / 8, '1/8'], [1 / 4, '1/4'], [1 / 3, '1/3'], [3 / 8, '3/8'], [1 / 2, '1/2'], [5 / 8, '5/8'], [2 / 3, '2/3'], [3 / 4, '3/4'], [7 / 8, '7/8']];
 
 /** 3.5 -> "3 1/2", 0.25 -> "1/4", 2 -> "2", 1.3 -> "1.3". */
 export function formatAmount(n: number): string {
   const whole = Math.floor(n), frac = n - whole;
-  if (frac < 0.01) return String(whole);
-  const hit = FRACTIONS.find(([v]) => Math.abs(v - frac) < 0.02);
-  if (!hit) return String(Math.round(n * 100) / 100);
+  if (frac === 0) return String(whole);
+  // Allow floating-point representation error only; never round an arbitrary amount.
+  const hit = FRACTIONS.find(([v]) => Math.abs(v - frac) <= Number.EPSILON * Math.max(1, n) * 4);
+  if (!hit) return String(n);
   return whole ? `${whole} ${hit[1]}` : hit[1];
 }
 

@@ -244,7 +244,7 @@ describe('display parity with the built-in parser (work order: AI reader cleanup
     const ri = { amount: 3.5, unit: 'cups', name: 'bread flour', note: 'sifted', role: 'flour', isReference: false, isFinishing: false } as const;
     expect(originalLine(ri, 'nothing here')).toBe('3 1/2 cups bread flour, sifted');
     expect(formatAmount(0.25)).toBe('1/4');
-    expect(formatAmount(2.667)).toBe('2 2/3');
+    expect(formatAmount(2 + 2 / 3)).toBe('2 2/3');
     expect(formatAmount(2)).toBe('2');
     expect(formatAmount(1.3)).toBe('1.3');
   });
