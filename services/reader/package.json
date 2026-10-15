@@ -1,0 +1,24 @@
+{
+  "name": "@bgb/recipe-reader",
+  "version": "0.1.0",
+  "description": "Turns pasted recipe text into the dough-core Recipe shape. The model reads; the engine does every number.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "try": "node --env-file-if-exists=.env --import tsx src/cli.ts"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@bgb/dough-core": "file:../../packages/core"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.4"
+  }
+}
