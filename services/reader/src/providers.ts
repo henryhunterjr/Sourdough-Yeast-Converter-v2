@@ -37,7 +37,6 @@ export function anthropicProvider(opts: { apiKey: string; model?: string; fetchI
         body: JSON.stringify({
           model,
           max_tokens: 4096,
-          temperature: 0,
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content }],
           output_config: { format: { type: 'json_schema', schema: READ_RECIPE_JSON_SCHEMA } },
