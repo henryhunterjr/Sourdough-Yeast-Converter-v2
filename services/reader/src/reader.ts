@@ -13,7 +13,7 @@
  *      labelled as such.
  */
 import {
-  parseRecipeText, parseAmount, toGrams, classify, cleanName,
+  parseRecipeText, parseAmount, toGrams, classify, cleanName, recipeDocument,
   type Recipe, type Component, type Ingredient, type Role, type ComponentKind,
 } from '@bgb/dough-core';
 import { COMPONENT_KINDS, ROLES, type ReadRecipe, type ReadIngredient } from './schema.js';
@@ -46,12 +46,15 @@ export interface ReadOptions {
 
 export async function readRecipe(input: string | ReadInput, provider: Provider | null, opts: ReadOptions = {}): Promise<ReadResult> {
   const starterHydration = opts.starterHydration ?? 100;
-  const inp: ReadInput = typeof input === 'string' ? { text: input } : input;
+  const rawInput: ReadInput = typeof input === 'string' ? { text: input } : input;
+  const document = recipeDocument(rawInput.text ?? '');
+  const inp = { ...rawInput, text: document.text };
   const hasImages = !!inp.images?.length;
   const text = inp.text ?? '';
 
   const fallback = () => {
     const p = parseRecipeText(text, starterHydration);
+    if (document.sourceNotes.length) p.recipe.sourceNotes = document.sourceNotes;
     return {
       recipe: p.recipe,
       source: 'parser' as const,
@@ -87,7 +90,8 @@ export async function readRecipe(input: string | ReadInput, provider: Provider |
 
   // For images the model's own transcription stands in for the source text:
   // amounts are checked against it and the deterministic parser runs on it.
-  const sourceText = text.trim() ? text : parsed.value.transcript;
+  const imageDocument = recipeDocument(parsed.value.transcript);
+  const sourceText = text.trim() ? text : imageDocument.text;
   const flags: Flag[] = [];
   if (hasImages) {
     flags.push({ level: 'info', message: sourceText.trim()
@@ -95,6 +99,10 @@ export async function readRecipe(input: string | ReadInput, provider: Provider |
       : 'Read from a photo or scan with no transcription, so amounts could not be checked. Compare every line with your original.' });
   }
   const recipe = toRecipe(parsed.value, sourceText, starterHydration, flags);
+  const sourceNotes = [...new Set([...document.sourceNotes, ...imageDocument.sourceNotes])];
+  if (sourceNotes.length) recipe.sourceNotes = sourceNotes;
+  const referenceCheck = parseRecipeText(sourceText, starterHydration);
+  flags.push(...referenceCheck.issues.filter(i => i.reason.startsWith('The source references')).map(i => ({ level: 'warning' as const, message: i.reason })));
 
   if (opts.crossCheck !== false && sourceText.trim()) {
     const det = parseRecipeText(sourceText, starterHydration).recipe;
@@ -220,7 +228,8 @@ function toIngredient(ri: ReadIngredient, comp: { name: string; kind: string }, 
       const g = gramsFor(b, flags, { component: 'preferment', ingredient: b.name });
       if (g !== null) grams += g;
     }
-    return { name, grams, role: 'starter', isReference: true };
+    return { name, grams, role: 'starter', isReference: true,
+      ...(ri.amount !== null ? { original: { amount: ri.amount, unit: ri.unit, text: originalLine(ri, sourceText, usedSourceLines) } } : {}) };
   }
 
   if (ri.amount === null) {

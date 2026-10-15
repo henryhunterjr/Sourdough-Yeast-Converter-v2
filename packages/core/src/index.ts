@@ -8,3 +8,4 @@ export { editMethodToSourdough, editMethodToYeast, rescaleTimes } from './method
 export { parseRecipeText, detectLanguage } from './parse.js';
 export type { ParseResult, ParseIssue } from './parse.js';
 export { renderRecipe } from './format.js';
+export { recipeDocument } from './document.js';

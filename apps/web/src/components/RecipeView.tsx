@@ -54,6 +54,7 @@ export function RecipeView({ recipe, s, highlightChanges }: { recipe: Recipe; s:
           </ol>
         </div>
       )}
+      {!!recipe.sourceNotes?.length && <details className="transcript"><summary>{s.sourceNotes}</summary>{recipe.sourceNotes.map((note, i) => <pre className="plain" key={i}>{note}</pre>)}</details>}
     </>
   );
 }

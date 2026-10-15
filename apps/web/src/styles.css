@@ -102,6 +102,9 @@ textarea.paste:focus { border-color: var(--accent); }
 .results-layout .tool-name { margin-bottom: 18px; }
 .results-layout .intro h1 { max-width: 720px; font-size: 62px; margin-bottom: 17px; letter-spacing: -1.2px; }
 .results-layout .intro-copy { max-width: 650px; font-size: 15px; line-height: 1.65; margin-bottom: 0; }
+.return-nav { margin-top: 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.return-nav .btn { flex: none; }
+.return-nav p { font-size: 12px; color: var(--ink-2); margin: 0; }
 .results-layout > .card { margin-bottom: 18px; }
 .reader-status { background: #f7faeee8; padding: 22px 24px; }
 .badge { display: inline-flex; align-items: center; gap: 7px; border-radius: 9px; padding: 6px 10px; font-size: 12px; line-height: 1.5; font-weight: 600; background: #e9eede; color: var(--accent); }

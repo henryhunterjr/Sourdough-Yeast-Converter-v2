@@ -8,6 +8,7 @@
 import type { Component, ComponentKind, Ingredient, Recipe, Step } from './model.js';
 import { classify, OTHER_CLASS } from './ingredients.js';
 import { parseAmount, toGrams } from './units.js';
+import { recipeDocument } from './document.js';
 
 export interface ParseIssue { line: string; reason: string }
 
@@ -56,6 +57,8 @@ export function detectLanguage(text: string): 'en' | 'es' {
 }
 
 export function parseRecipeText(text: string, starterHydration = 100): ParseResult {
+  const document = recipeDocument(text);
+  text = document.text;
   const issues: ParseIssue[] = [];
   const language = detectLanguage(text);
   const rawLines = text.replace(/\r/g, '').split('\n');
@@ -108,7 +111,7 @@ export function parseRecipeText(text: string, starterHydration = 100): ParseResu
       // "Pinch of salt" names an ingredient and matches no section word, so it is not one.
       const isFirst = !title && components.length === 0;
       const namesSection = SECTION_WORD.test(line) || KIND_RULES.some(([re]) => re.test(line));
-      if (looksLikeHeading(line) && (isFirst || namesSection || classify(line) === OTHER_CLASS)) {
+      if (looksLikeHeading(line) && (isFirst || namesSection || /:$/.test(line) || classify(line) === OTHER_CLASS)) {
         if (!title && components.length === 0 && !/:$/.test(line) && !SECTION_WORD.test(line)) { title = line; continue; }
         current = { kind: kindFor(line, components.length === 0), name: line.replace(/[:：]$/, '').trim(), ingredients: [] };
         components.push(current);
@@ -162,5 +165,13 @@ export function parseRecipeText(text: string, starterHydration = 100): ParseResu
   if (buffer) steps.push({ text: buffer });
 
   const recipe: Recipe = { title, components, steps, starterHydration, language };
+  if (document.sourceNotes.length) recipe.sourceNotes = document.sourceNotes;
+  const builds = components.filter(c => c.kind === 'preferment');
+  if (builds.length === 1) {
+    const built = builds[0]!.ingredients.filter(i => !i.isReference).reduce((sum, i) => sum + i.grams, 0);
+    for (const i of components.flatMap(c => c.ingredients).filter(i => i.isReference && i.original?.unit === 'g')) {
+      if (Math.abs(i.grams - built) > 0.5) issues.push({ line: i.original!.text, reason: `The source references ${i.grams}g of preferment, but its ingredient build totals ${built}g. Check the original; neither amount was changed.` });
+    }
+  }
   return { recipe, issues };
 }

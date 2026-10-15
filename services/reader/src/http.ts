@@ -18,7 +18,7 @@ export interface HandlerOptions {
   allowOrigin?: string;
   /** Hard cap on pasted text, in characters. Default 20,000. */
   maxChars?: number;
-  /** Max images per request and max base64 characters per image. Defaults 4 and 6,000,000 (~4.5MB). */
+  /** Up to 12 PDF pages/images, with a bounded combined request size. */
   maxImages?: number;
   maxImageChars?: number;
 }
@@ -27,7 +27,7 @@ export function handler(opts: HandlerOptions = {}) {
   const provider = opts.provider === undefined ? providerFromEnv() : opts.provider;
   const origin = opts.allowOrigin ?? '*';
   const maxChars = opts.maxChars ?? 20_000;
-  const maxImages = opts.maxImages ?? 4;
+  const maxImages = opts.maxImages ?? 12;
   const maxImageChars = opts.maxImageChars ?? 6_000_000;
   const cors = {
     'access-control-allow-origin': origin,
@@ -60,6 +60,7 @@ export function handler(opts: HandlerOptions = {}) {
         }
       }
       if (!text.trim() && images.length === 0) return { error: 'text or images is required', status: 400 };
+      if (text.length + images.reduce((n, image) => n + image.data.length, 0) > 4_000_000) return { error: 'Combined input is too large. Split the PDF or use its print version.', status: 413 };
       return { text, images };
     };
 

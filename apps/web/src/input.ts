@@ -4,7 +4,7 @@
  * text become text (full guardrails apply); scanned PDFs become page images.
  */
 export interface ImageInput { data: string; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'; preview: string; name: string }
-export type Prepared = { text?: string; images?: ImageInput[] };
+export type Prepared = { text?: string; images?: ImageInput[]; document?: { name: string; pages: number; mode: 'text' | 'images' } };
 
 const MAX_EDGE = 1800;
 const JPEG_Q = 0.85;
@@ -42,14 +42,19 @@ async function preparePdf(file: File): Promise<Prepared> {
   const pdfjs = await import('pdfjs-dist');
   const worker = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
   pdfjs.GlobalWorkerOptions.workerSrc = worker;
-  const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
-  const pages = Math.min(doc.numPages, 12);
+  const loadingTask = pdfjs.getDocument({ data: await file.arrayBuffer() });
+  const doc = await loadingTask.promise;
+  if (doc.numPages > 12) { await loadingTask.destroy(); throw new Error('This PDF has more than 12 pages. Split it or upload the recipe print version. No pages were imported.'); }
+  const pages = doc.numPages;
+  try {
 
   // 1) Real text layer?
   const lines: string[] = [];
+  const pageTextLengths: number[] = [];
   for (let p = 1; p <= pages; p++) {
     const page = await doc.getPage(p);
     const content = await page.getTextContent();
+    pageTextLengths.push(content.items.reduce((n, item) => n + ('str' in item ? item.str.trim().length : 0), 0));
     let lastY: number | null = null, line = '';
     for (const item of content.items as Array<{ str: string; transform: number[]; hasEOL?: boolean }>) {
       const y = Math.round(item.transform[5]!);
@@ -63,11 +68,11 @@ async function preparePdf(file: File): Promise<Prepared> {
   }
   const text = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   const withNumbers = text.split('\n').filter(l => /\d/.test(l)).length;
-  if (withNumbers >= 3) return { text };
+  if (withNumbers >= 3 && pageTextLengths.every(n => n >= 40)) return { text, document: { name: file.name, pages, mode: 'text' } };
 
-  // 2) Scanned: render the first pages as images.
+  // 2) Scanned or mixed text/image document: send every page, never truncate.
   const images: ImageInput[] = [];
-  for (let p = 1; p <= Math.min(pages, 4); p++) {
+  for (let p = 1; p <= pages; p++) {
     const page = await doc.getPage(p);
     const vp = page.getViewport({ scale: 1 });
     const scale = Math.min(2, MAX_EDGE / Math.max(vp.width, vp.height));
@@ -78,5 +83,6 @@ async function preparePdf(file: File): Promise<Prepared> {
     const dataUrl = canvas.toDataURL('image/jpeg', JPEG_Q);
     images.push({ data: dataUrl.split(',')[1]!, mediaType: 'image/jpeg', preview: dataUrl, name: `${file.name} p${p}` });
   }
-  return { images };
+  return { images, document: { name: file.name, pages, mode: 'images' } };
+  } finally { await loadingTask.destroy(); }
 }

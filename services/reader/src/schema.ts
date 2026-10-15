@@ -102,4 +102,7 @@ Rules:
 9. If something is ambiguous (a smudged number, a line you cannot read, two amounts for one ingredient), make your best reading AND add one line to uncertainties saying what you were unsure about. Otherwise uncertainties is an empty array.
 10. transcript: when the recipe arrives as an image or PDF, copy its text into transcript exactly as it appears, line by line, every ingredient line and every step, nothing added. When the recipe arrives as text, transcript is "".
 11. If the input is not a recipe, or no ingredient amounts can be read at all, return one component with no ingredients and explain in uncertainties.
-12. Return only the JSON object. No prose, no markdown fences.`;
+12. Recipe Pantry print and one-sheet PDFs can span many pages. Read all supplied pages as one document, in order. Some pages are images, not selectable text. Keep the selected yeasted or sourdough version as written; do not combine it with an alternate version mentioned in a description or FAQ.
+13. Ingredient tables may put names before amounts, with a separate Baker's % column. Use the ingredient amount, never the percentage, subtotal, hydration, nutrition figure, equipment count, or ingredient chip repeated inside a method. Secondary volume lines belong to the same ingredient as the gram line above. Do not count them twice.
+14. Keep all ingredient section headings, prep notes and method steps. Keep baker's notes, storage, FAQ, substitutions, advertisements and page headers/footers out of ingredients and method. Do not invent missing sections or repair conflicting source quantities. Flag conflicting amounts or incomplete pages in uncertainties.
+15. Return only the JSON object. No prose, no markdown fences.`;

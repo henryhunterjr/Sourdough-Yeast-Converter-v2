@@ -22,5 +22,6 @@ export function renderRecipe(recipe: Recipe): string {
     '',
   );
   recipe.steps.forEach((s, n) => lines.push(`${n + 1}. ${s.text}${s.changed && s.changed !== 'kept' ? `  [${s.changed}]` : ''}`));
+  if (recipe.sourceNotes?.length) lines.push('', es ? 'Notas de la fuente' : 'Source notes', ...recipe.sourceNotes);
   return lines.join('\n');
 }

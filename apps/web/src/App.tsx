@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { analyze, convertToSourdough, convertToYeast, detectLanguage, renderRecipe, sanityCheck, type Conversion, type Recipe } from '@bgb/dough-core';
 import { readRecipe, type Flag, type ReadResult } from './api';
-import { prepareFile, type ImageInput } from './input';
+import { prepareFile, type ImageInput, type Prepared } from './input';
 import { t, type Lang } from './i18n';
 import { EXAMPLES } from './examples';
 import { RecipeView } from './components/RecipeView';
@@ -27,6 +27,9 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [images, setImages] = useState<ImageInput[]>([]);
+  const [document, setDocument] = useState<Prepared['document']>();
+  const [importError, setImportError] = useState<string | null>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [read, setRead] = useState<ReadResult | null>(null);
@@ -70,14 +73,24 @@ export default function App() {
 
   async function addFiles(files: FileList | null) {
     if (!files?.length) return;
+    const selected = Array.from(files);
+    if (cameraRef.current) cameraRef.current.value = '';
+    if (fileRef.current) fileRef.current.value = '';
+    const pdf = selected.some(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
+    if (pdf && selected.length > 1) { setImportError(s.onePdf); return; }
+    if (pdf && canGo && !window.confirm(s.replacePdf)) return;
+    setImportError(null);
     setPreparing(true);
     try {
-      for (const f of Array.from(files).slice(0, 4)) {
-        const prep = await prepareFile(f);
-        if (prep.text) setText(t => (t.trim() ? t + '\n\n' : '') + prep.text);
-        if (prep.images) setImages(im => [...im, ...prep.images!].slice(0, 4));
-      }
-    } catch (e) { setToast((e as Error).message); }
+      if (selected.length > 12) throw new Error(s.tooManyImages);
+      const prepared: Prepared[] = [];
+      for (const file of selected) prepared.push(await prepareFile(file));
+      const nextImages = [...(pdf ? [] : images), ...prepared.flatMap(p => p.images ?? [])];
+      if (nextImages.length > 12 || nextImages.reduce((n, im) => n + im.data.length, 0) > 4_000_000) throw new Error(s.tooManyImages);
+      const newText = prepared.flatMap(p => p.text ? [p.text] : []).join('\n\n');
+      if (pdf) { setText(newText); setImages(nextImages); setDocument(prepared[0]?.document); }
+      else { if (newText) setText(t => [t, newText].filter(Boolean).join('\n\n')); setImages(nextImages); }
+    } catch (e) { setImportError((e as Error).message); }
     finally { setPreparing(false); if (cameraRef.current) cameraRef.current.value = ''; if (fileRef.current) fileRef.current.value = ''; }
   }
 
@@ -89,11 +102,15 @@ export default function App() {
     try {
       const r = await readRecipe({ text, images: images.map(i => ({ data: i.data, mediaType: i.mediaType })) }, hydration, ac.signal);
       if (!ac.signal.aborted) { setRead(r); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-    } finally { if (!ac.signal.aborted) setBusy(false); }
+    } catch (e) { if ((e as Error).name !== 'AbortError') setToast((e as Error).message); }
+    finally { if (!ac.signal.aborted) setBusy(false); }
   }
 
-  function clear() { abort.current?.abort(); setRead(null); setText(''); setImages([]); setBusy(false); setDirChoice('auto'); }
-  function editRecipe() { abort.current?.abort(); setRead(null); setBusy(false); }
+  function clear() { abort.current?.abort(); setRead(null); setText(''); setImages([]); setDocument(undefined); setImportError(null); setBusy(false); setDirChoice('auto'); }
+  function editRecipe() {
+    abort.current?.abort(); setRead(null); setBusy(false); setSheet(false);
+    requestAnimationFrame(() => { textRef.current?.focus(); window.scrollTo({ top: 0, behavior: 'instant' }); });
+  }
 
   const outputText = () => {
     const r = tab === 'converted' && conversion ? conversion.recipe : original;
@@ -139,15 +156,20 @@ export default function App() {
           <p className="tool-name"><Icon name="swap" />{s.toolName}</p>
           <h1>{read ? s.resultTitle : s.heroTitle}</h1>
           <p className="intro-copy">{read ? s.resultIntro : s.heroIntro}</p>
+          {read && <nav className="return-nav" aria-label={s.backToStart}>
+            <button className="btn secondary" onClick={editRecipe}>{s.editRecipe}</button><p>{s.draftKept}</p>
+          </nav>}
           {!read && <div className="intro-note"><span className="check-seal"><Icon name="check" /></span><p>{s.heroDetail}</p></div>}
         </section>
         {!read && (
           <>
             <section className="card recipe-input" aria-busy={busy || preparing}>
               <div className="card-heading"><h2><label htmlFor="recipe-text">{s.paste}</label></h2><span>{s.inputFormats}</span></div>
-              <textarea id="recipe-text" className="paste" aria-describedby="recipe-help" value={text} onChange={e => setText(e.target.value)} placeholder={s.pastePlaceholder} spellCheck={false} autoCapitalize="off" />
+              <textarea ref={textRef} id="recipe-text" className="paste" aria-describedby="recipe-help" disabled={preparing} value={text} onChange={e => setText(e.target.value)} placeholder={s.pastePlaceholder} spellCheck={false} autoCapitalize="off" />
               <p id="recipe-help" className="input-help">{s.inputHelp}</p>
               <p className="input-help authored-alternate">{s.authoredAlternate}</p>
+              {document && <p className="input-help">{document.name} · {document.pages} {s.pdfPages} · {document.mode === 'text' ? s.pdfText : s.pdfImages}</p>}
+              {importError && <p className="flag error" role="alert">{importError}</p>}
               <div className="attach-row">
                 <button className="btn secondary" onClick={() => cameraRef.current?.click()} disabled={preparing}><Icon name="camera" />{s.takePhoto}</button>
                 <button className="btn secondary" onClick={() => fileRef.current?.click()} disabled={preparing}>{preparing ? <><span className="spinner" />{s.preparing}</> : <><Icon name="upload" />{s.upload}</>}</button>
@@ -203,7 +225,6 @@ export default function App() {
             {read.transcript && (
               <details className="transcript"><summary>{s.transcript}</summary><p>{s.transcriptHint}</p><pre className="plain">{read.transcript}</pre></details>
             )}
-            <button className="btn secondary" onClick={editRecipe}>{s.editRecipe}</button>
           </section>
         )}
 
@@ -272,14 +293,14 @@ export default function App() {
           {!read ? (
             <>
               <span className="dock-note">{s.readyHint}</span>
-              {canGo && <button className="btn secondary" onClick={clear}>{s.clear}</button>}
+              {canGo && <button className="btn secondary" onClick={clear} disabled={preparing}>{s.clear}</button>}
               <button className="btn primary-wide" onClick={go} disabled={!canGo || busy || preparing}>
                 {busy ? <><span className="spinner" />{s.reading}</> : <>{s.convert}<Icon name="arrow" /></>}
               </button>
             </>
           ) : (
             <>
-              <button className="btn secondary" onClick={clear}>{s.clear}</button>
+              <button className="btn secondary" onClick={editRecipe} aria-label={s.backToStart}>{s.back}</button>
               {original && original.components.length > 0 && <>
               <button className="btn secondary" onClick={() => setSheet(true)}><Icon name="tune" />{s.options}</button>
               <button className="btn secondary" onClick={copy}><Icon name="copy" />{s.copy}</button>

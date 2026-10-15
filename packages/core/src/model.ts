@@ -83,6 +83,8 @@ export interface Recipe {
   title?: string;
   components: Component[];
   steps: Step[];
+  /** Separate source notes, never ingredients or rewritten method steps. */
+  sourceNotes?: string[];
   /** Hydration of the baker's starter, as a percent. Default 100. */
   starterHydration: number;
   language?: 'en' | 'es';

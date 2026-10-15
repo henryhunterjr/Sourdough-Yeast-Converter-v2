@@ -210,7 +210,9 @@ describe('photo and scan input', () => {
     const post = (body: unknown) => h(new Request('https://x.test/read', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }));
     expect((await post({ images: [IMG] })).status).toBe(200);
     expect((await post({ images: [{ data: 'AAAA', mediaType: 'image/bmp' }] })).status).toBe(400);
-    expect((await post({ images: [IMG, IMG, IMG, IMG, IMG] })).status).toBe(413);
+    expect((await post({ images: [IMG, IMG, IMG, IMG, IMG] })).status).toBe(200);
+    expect((await post({ images: Array(13).fill(IMG) })).status).toBe(413);
+    expect((await post({ images: [{ ...IMG, data: 'A'.repeat(4_000_001) }] })).status).toBe(413);
     expect((await post({})).status).toBe(400);
   });
 });

@@ -1,0 +1,159 @@
+{
+  "title": "Cranberry Orange Loaf",
+  "language": "en",
+  "components": [
+    {
+      "kind": "dough",
+      "name": "DOUGH (YEASTED VERSION)",
+      "ingredients": [
+        {
+          "amount": 500,
+          "unit": "g",
+          "name": "Bread flour",
+          "note": "",
+          "role": "flour",
+          "isReference": false,
+          "isFinishing": false
+        },
+        {
+          "amount": 160,
+          "unit": "g",
+          "name": "Whole milk",
+          "note": "lukewarm (about 95°F / 35°C)",
+          "role": "dairy",
+          "isReference": false,
+          "isFinishing": false
+        },
+        {
+          "amount": 130,
+          "unit": "g",
+          "name": "Fresh orange juice",
+          "note": "room temperature",
+          "role": "liquid",
+          "isReference": false,
+          "isFinishing": false
+        },
+        {
+          "amount": 40,
+          "unit": "g",
+          "name": "Honey",
+          "note": "",
+          "role": "sweetener",
+          "isReference": false,
+          "isFinishing": false
+        },
+        {
+          "amount": 50,
+          "unit": "g",
+          "name": "Unsalted butter",
+          "note": "softened",
+          "role": "fat",
+          "isReference": false,
+          "isFinishing": false
+        },
+        {
+          "amount": 10,
+          "unit": "g",
+          "name": "Fine sea salt",
+          "note": "",
+          "role": "salt",
+          "isReference": false,
+          "isFinishing": false
+        },
+        {
+          "amount": 7,
+          "unit": "g",
+          "name": "Instant yeast",
+          "note": "",
+          "role": "yeast",
+          "isReference": false,
+          "isFinishing": false
+        },
+        {
+          "amount": 12,
+          "unit": "g",
+          "name": "Orange zest",
+          "note": "from 2 oranges",
+          "role": "spice",
+          "isReference": false,
+          "isFinishing": false
+        }
+      ]
+    },
+    {
+      "kind": "other",
+      "name": "CRANBERRIES",
+      "ingredients": [
+        {
+          "amount": 150,
+          "unit": "g",
+          "name": "Fresh cranberries",
+          "note": "halved (or frozen, unthawed)",
+          "role": "inclusion",
+          "isReference": false,
+          "isFinishing": false
+        },
+        {
+          "amount": 8,
+          "unit": "g",
+          "name": "Bread flour",
+          "note": "for tossing the berries",
+          "role": "flour",
+          "isReference": false,
+          "isFinishing": true
+        }
+      ]
+    },
+    {
+      "kind": "glaze",
+      "name": "ORANGE GLAZE (OPTIONAL)",
+      "ingredients": [
+        {
+          "amount": 120,
+          "unit": "g",
+          "name": "Powdered sugar",
+          "note": "sifted",
+          "role": "sweetener",
+          "isReference": false,
+          "isFinishing": false
+        },
+        {
+          "amount": 30,
+          "unit": "ml",
+          "name": "Fresh orange juice",
+          "note": "",
+          "role": "liquid",
+          "isReference": false,
+          "isFinishing": false
+        },
+        {
+          "amount": 1,
+          "unit": "g",
+          "name": "Orange zest",
+          "note": "",
+          "role": "spice",
+          "isReference": false,
+          "isFinishing": false
+        }
+      ]
+    }
+  ],
+  "steps": [
+    "Mix and Knead the Dough\n\nThis is a lightly enriched dough, soft from milk and butter, with orange juice doing double duty as liquid and flavor. The juice's acidity slows the yeast a touch, which is fine. It buys you flavor.\n\nZest first, then juice\n\nZest both oranges before you juice them. Rub the zest into the honey with your fingers for a minute. It sounds fussy, it isn't. The oils bloom into the honey and carry through the whole loaf.",
+    "Mix to a shaggy dough\n\nWhisk the flour and instant yeast in the mixer bowl. Add the lukewarm milk, orange juice, and the honey-zest mixture. Mix on low until no dry flour remains, about 2 minutes, then rest 10 minutes so the flour hydrates.",
+    "Add salt and butter, then knead\n\nAdd the salt, then knead on medium while adding the soft butter a piece at a time. Keep going 8-10 minutes until the dough is smooth and passes the windowpane test. It should feel supple and slightly tacky, not sticky.",
+    "Fold in the cranberries\n\nPat the halved cranberries dry and toss them with the tablespoon of flour. Add them to the bowl and mix on the lowest speed 30-60 seconds, just until distributed. Overmix and they smear pink streaks through the dough. A few streaks are charming. A tie-dye loaf is not.",
+    "Bulk Ferment\n\nOne straight rise until doubled. This is also your Friday-night pause point if you'd rather bake with your coffee on Saturday.\n\nRise until doubled\n\nRound the dough into an oiled bowl, cover, and let it rise 1 3/4 to 2 hours at 75°F (24°C), until doubled. The orange juice slows things slightly, so trust the size of the dough, not the clock.",
+    "Or pause here overnight\n\nFor the make-ahead route, put the covered bowl straight into the fridge after mixing and let the cold retard run 8-16 hours. Saturday morning, the dough is risen, cold, and easier to shape than it ever is warm. Shape it straight from the fridge and add 20-30 minutes to the final proof.",
+    "Shape the Loaf\n\nA standard sandwich-loaf shape, done gently so the berries stay put.\n\nDegas and pat out\n\nTurn the dough onto a lightly floured counter and pat it into a rough 8x10 inch rectangle, pressing out the big bubbles. Any berries that pop out, tuck them back in. Berries on the surface scorch in the oven.",
+    "Roll and seal\n\nWith a short side facing you, roll the dough into a snug log, pressing the seam as you go. Pinch the final seam and the ends closed, then place it seam-side down in the greased 9x5 pan.",
+    "Shaping the Loaf — choose your method\n\nKeep the tension even and the berries buried, and the loaf takes care of itself.\n\nStandard Pan Loaf\n\nThe classic 9x5 sandwich shape.\n\nGently press the dough into an 8x10 inch rectangle, tucking any exposed berries back inside.",
+    "Roll from a short side into a tight log, pinch the seam and ends, and set it seam-down in the pan.",
+    "Proof, Bake, and Glaze\n\nModerate heat, a foil tent when it's bronzed, and a thermometer to call it done. The glaze goes on only after the loaf is fully cool.\n\nOVEN\n350°F (175°C)\nDONE AT\n190°F (88°C)\n\n9x5 Loaf Pan (Recommended)\n\nThe standard method for both the yeasted and sourdough versions.\n\nEquipment: 9x5 inch loaf pan\n\nFinal proof: Cover the pan loosely and proof 60-75 minutes, until the dough crowns about 1 inch above the rim. Preheat the oven to 350°F (175°C) when the dough reaches the rim. If the dough was cold-retarded, expect 90-105 minutes.",
+    "Bake: Bake 40-45 minutes, until deep golden and 190°F (88°C) at the center. The honey and juice brown fast, so tent with foil around the 25-minute mark. Sourdough version runs about 5 minutes longer.",
+    "Cool completely: Cool in the pan 10 minutes, then turn out onto a rack. Let it cool at least 90 minutes before glazing or slicing. Warm bread plus glaze equals a puddle, and warm cranberry bread slices gummy.",
+    "Glaze (optional): Whisk the powdered sugar, orange juice, and zest until smooth. It should ribbon off the whisk and hold for a second. Drizzle over the cool loaf and let it set 20 minutes before slicing.\n\n190°F (88°C) internal, no exceptions. The berries add moisture that fools the thump test."
+  ],
+  "uncertainties": [],
+  "transcript": "Print This One-Sheet\nRECIPE PANTRY\nCRUST & CRUMB ACADEMY\nFROM THE PANTRY OF HENRY HUNTER\nCranberry Orange Loaf\n\nSoft Yeasted Loaf, Bright with Citrus\n\nSoft yeasted cranberry orange loaf with fresh berries, zest, and juice in the dough. Includes a full sourdough version and an optional orange glaze.\n\nYIELD\nOne 9x5 inch loaf, about 12 thick slices\nPREP\n30 minutes\nBAKE\n40-45 minutes at 350°F (175°C)\nTOTAL\nAbout 5 hours same-day, or split over two days with the cold retard\nDOUGH (YEASTED VERSION)\n500g\nBread flour\n4 cups\n160g\nWhole milk, lukewarm (about 95°F / 35°C)\n2/3 cup\n130g\nFresh orange juice, room temperature\n1/2 cup + 1 tbsp\n40g\nHoney\n2 tbsp\n50g\nUnsalted butter, softened\n3 1/2 tbsp\n10g\nFine sea salt\n1 3/4 tsp\n7g\nInstant yeast\n2 1/4 tsp\n12g\nOrange zest (from 2 oranges)\n2 tbsp\nCRANBERRIES\n150g\nFresh cranberries, halved (or frozen, unthawed)\n1 1/2 cups\n8g\nBread flour, for tossing the berries\n1 tbsp\nORANGE GLAZE (OPTIONAL)\n120g\nPowdered sugar, sifted\n1 cup\n30ml\nFresh orange juice\n2 tbsp\n1g\nOrange zest\n1/2 tsp\nBAKER'S PERCENTAGES\n500g (100%)\nTotal flour\n58%\nHydration\n2%\nSalt\nEQUIPMENT\n9x5 inch loaf pan\nStand mixer with dough hook (or a bowl and 15 minutes of hand kneading)\nDigital scale\nMicroplane zester\nInstant-read thermometer\nDough whisk (for the hand-mix crowd)\nCooling rack\nSmall whisk (for the glaze)\nSTORAGE\nRoom Temperature\n3-4 days wrapped or in a bread bag. Glazed loaves keep best under a cake dome. Toast slices to refresh.\nFrozen\nUp to 3 months. Freeze unglazed if you can, sliced for easy toasting, and glaze after thawing.\nTip\nDay-three slices make outrageous French toast.\nQUESTIONS\nCan I use dried cranberries instead of fresh?\n\nYes. Use 120g dried, soaked 20 minutes in hot orange juice, drained and patted dry. The loaf comes out sweeter and less tart than the fresh-berry version, so consider skipping the glaze.\n\nWhy did my dough turn pink and streaky?\n\nThe berries broke down, either from overmixing or from thawed frozen fruit. Add berries in the last 30-60 seconds on the lowest speed, and always add frozen berries straight from the freezer. A few pink streaks around each berry are normal and honestly pretty.\n\nDoes the orange juice hurt the yeast?\n\nIt slows things a little, which is why the bulk rise runs closer to 2 hours than 90 minutes. That's built into the schedule. Don't add extra yeast to compensate, you'd trade flavor for speed and win neither.\n\nHow does the sourdough timeline actually work for a weekend?\n\nBuild the levain Friday at 9 PM. Saturday: mix at 8 AM, bulk until about 1 PM, shape, then either proof warm and bake by 4:30 PM, or refrigerate the shaped loaf and bake Sunday at 8 AM straight from the fridge. The cold-retard route is the more forgiving of the two.\n\nCan I use all-purpose flour?\n\nYes, with a slightly softer crumb. Hold back 15g of the milk and add it only if the dough feels dry, since all-purpose absorbs less.\n\nHow do I know it's actually done?\n\nTemperature, not color. The crust looks done 10 minutes before the center is, thanks to the honey and juice. Pull it at 190°F (88°C) in the center. Under that, the berry pockets stay gummy.\n\nMETHOD\nMix and Knead the Dough\n\nThis is a lightly enriched dough, soft from milk and butter, with orange juice doing double duty as liquid and flavor. The juice's acidity slows the yeast a touch, which is fine. It buys you flavor.\n\n1\nZest first, then juice\n\nZest both oranges before you juice them. Rub the zest into the honey with your fingers for a minute. It sounds fussy, it isn't. The oils bloom into the honey and carry through the whole loaf.\n\n2\nMix to a shaggy dough\n\nWhisk the flour and instant yeast in the mixer bowl. Add the lukewarm milk, orange juice, and the honey-zest mixture. Mix on low until no dry flour remains, about 2 minutes, then rest 10 minutes so the flour hydrates.\n\n3\nAdd salt and butter, then knead\n\nAdd the salt, then knead on medium while adding the soft butter a piece at a time. Keep going 8-10 minutes until the dough is smooth and passes the windowpane test. It should feel supple and slightly tacky, not sticky.\n\n4\nFold in the cranberries\n\nPat the halved cranberries dry and toss them with the tablespoon of flour. Add them to the bowl and mix on the lowest speed 30-60 seconds, just until distributed. Overmix and they smear pink streaks through the dough. A few streaks are charming. A tie-dye loaf is not.\n\nBulk Ferment\n\nOne straight rise until doubled. This is also your Friday-night pause point if you'd rather bake with your coffee on Saturday.\n\n5\nRise until doubled\n\nRound the dough into an oiled bowl, cover, and let it rise 1 3/4 to 2 hours at 75°F (24°C), until doubled. The orange juice slows things slightly, so trust the size of the dough, not the clock.\n\n6\nOr pause here overnight\n\nFor the make-ahead route, put the covered bowl straight into the fridge after mixing and let the cold retard run 8-16 hours. Saturday morning, the dough is risen, cold, and easier to shape than it ever is warm. Shape it straight from the fridge and add 20-30 minutes to the final proof.\n\nShape the Loaf\n\nA standard sandwich-loaf shape, done gently so the berries stay put.\n\n7\nDegas and pat out\n\nTurn the dough onto a lightly floured counter and pat it into a rough 8x10 inch rectangle, pressing out the big bubbles. Any berries that pop out, tuck them back in. Berries on the surface scorch in the oven.\n\n8\nRoll and seal\n\nWith a short side facing you, roll the dough into a snug log, pressing the seam as you go. Pinch the final seam and the ends closed, then place it seam-side down in the greased 9x5 pan.\n\nShaping the Loaf — choose your method\n\nKeep the tension even and the berries buried, and the loaf takes care of itself.\n\nStandard Pan Loaf\n\nThe classic 9x5 sandwich shape.\n\nGently press the dough into an 8x10 inch rectangle, tucking any exposed berries back inside.\nRoll from a short side into a tight log, pinch the seam and ends, and set it seam-down in the pan.\nProof, Bake, and Glaze\n\nModerate heat, a foil tent when it's bronzed, and a thermometer to call it done. The glaze goes on only after the loaf is fully cool.\n\nOVEN\n350°F (175°C)\nDONE AT\n190°F (88°C)\n9x5 Loaf Pan (Recommended)\n\nThe standard method for both the yeasted and sourdough versions.\n\nEquipment: 9x5 inch loaf pan\n\nFinal proof: Cover the pan loosely and proof 60-75 minutes, until the dough crowns about 1 inch above the rim. Preheat the oven to 350°F (175°C) when the dough reaches the rim. If the dough was cold-retarded, expect 90-105 minutes.\nBake: Bake 40-45 minutes, until deep golden and 190°F (88°C) at the center. The honey and juice brown fast, so tent with foil around the 25-minute mark. Sourdough version runs about 5 minutes longer.\nCool completely: Cool in the pan 10 minutes, then turn out onto a rack. Let it cool at least 90 minutes before glazing or slicing. Warm bread plus glaze equals a puddle, and warm cranberry bread slices gummy.\nGlaze (optional): Whisk the powdered sugar, orange juice, and zest until smooth. It should ribbon off the whisk and hold for a second. Drizzle over the cool loaf and let it set 20 minutes before slicing.\n\n190°F (88°C) internal, no exceptions. The berries add moisture that fools the thump test.\n\nrecipepantry.app/recipes/cranberry-orange-loaf\nRecipe by Henry Hunter"
+}
