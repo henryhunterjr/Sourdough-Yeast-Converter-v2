@@ -1,0 +1,19 @@
+{
+  "name": "@bgb/dough-core",
+  "version": "0.1.0",
+  "description": "Deterministic, tested conversion engine for the Baking Great Bread Sourdough-Yeast Recipe Converter.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.4"
+  }
+}
