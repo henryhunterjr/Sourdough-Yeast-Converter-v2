@@ -1,6 +1,10 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { readFileSync } from 'node:fs';
+
+const appVersion: string = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).version;
+const gitRevision = (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || 'local').slice(0, 7);
 
 /** Serve /api/read and /api/convert in dev with the same handler Vercel runs. */
 function devApi(): Plugin {
@@ -28,6 +32,10 @@ function devApi(): Plugin {
 }
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+    __BUILD_ID__: JSON.stringify(gitRevision),
+  },
   plugins: [
     react(),
     devApi(),
