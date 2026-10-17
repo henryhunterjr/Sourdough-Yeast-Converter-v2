@@ -170,8 +170,8 @@ export function composeStructuredMethod(source: Recipe, converted: Recipe, direc
   const seen = new Set<Stage>();
   if (direction === 'to-sourdough') out.push(added(levainDescription(converted, lang)));
   else out.push(added(lang === 'es'
-    ? 'Esta versión usa levadura comercial en el amasado. No prepares ni alimentes un levain.'
-    : 'This version uses commercial yeast in the dough. Do not build or feed a levain.'));
+    ? 'Usa levadura comercial directamente en la masa; no se necesita un prefermento aparte.'
+    : 'Use commercial yeast directly in the dough; no separate preferment is required.'));
 
   const saltStage = stages.has('salt');
   const hasProof = stages.has('proof');
