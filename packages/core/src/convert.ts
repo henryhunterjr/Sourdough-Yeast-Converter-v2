@@ -6,6 +6,7 @@ import { ROUND } from './units.js';
 import { analyze, resolveFractions, starterFlourFraction, starterWaterFraction } from './analyze.js';
 import type { Component, Ingredient, Recipe, YeastKind } from './model.js';
 import { editMethodToSourdough, editMethodToYeast } from './method.js';
+import { composeStructuredMethod } from './structuredMethod.js';
 
 export interface Note { level: 'info' | 'warning'; message: string }
 
@@ -132,7 +133,7 @@ export function convertToSourdough(input: Recipe, opts: ToSourdoughOptions = {})
   if (a.richness !== 'lean' && levainHyd <= 65) notes.push({ level: 'info', message: `Enriched dough: the levain is built stiff (${levainHyd}%) to keep the flavor mild and the dough workable. Expect bulk fermentation to run 4 to 7 hours.` });
   if (removedYeast.length === 0) notes.push({ level: 'info', message: 'No yeast was found to remove.' });
 
-  recipe.steps = editMethodToSourdough(recipe.steps, {
+  recipe.steps = composeStructuredMethod(input, recipe, 'to-sourdough') ?? editMethodToSourdough(recipe.steps, {
     language: recipe.language ?? 'en',
     richness: a.richness,
     levain: { seed, flour: addFlour, water: addWater, hydration: h },
@@ -232,7 +233,7 @@ export function convertToYeast(input: Recipe, opts: ToYeastOptions = {}): Conver
     ? `${Name} al ${(grams / after.totalFlour * 100).toFixed(1)}% de la harina (instantánea ${yeast.instant}g, seca activa ${yeast.activeDry}g o fresca ${yeast.fresh}g son intercambiables).`
     : `${Name} at ${(grams / after.totalFlour * 100).toFixed(1)}% of flour (instant ${yeast.instant}g, active dry ${yeast.activeDry}g, fresh ${yeast.fresh}g are interchangeable).` });
 
-  recipe.steps = editMethodToYeast(recipe.steps, { language: recipe.language ?? 'en', richness: after.richness, yeastKind: kind });
+  recipe.steps = composeStructuredMethod(input, recipe, 'to-yeast') ?? editMethodToYeast(recipe.steps, { language: recipe.language ?? 'en', richness: after.richness, yeastKind: kind });
 
   return { recipe, notes, yeast };
 }
