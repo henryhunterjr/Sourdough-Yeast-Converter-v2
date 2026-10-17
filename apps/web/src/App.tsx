@@ -8,6 +8,10 @@ import { RecipeView } from './components/RecipeView';
 import { OptionsSheet, DEFAULT_OPTIONS, type Options } from './components/OptionsSheet';
 import { Icon } from './components/Icon';
 import { AdaptationNotice, adaptationText } from './components/AdaptationNotice';
+import { conversionSafety } from './conversionSafety';
+
+declare const __APP_VERSION__: string;
+declare const __BUILD_ID__: string;
 
 type Direction = 'to-sourdough' | 'to-yeast';
 
@@ -69,6 +73,8 @@ export default function App() {
     } catch { return null; }
   }, [original, blocked, direction, opts]);
 
+  const safetyIssues = conversion && tab === 'converted' ? conversionSafety(conversion.recipe, direction) : [];
+  const canExport = !!(read?.recipe?.components.length && (tab === 'original' || (!!conversion && safetyIssues.length === 0)));
   const canGo = !!text.trim() || images.length > 0;
 
   async function addFiles(files: FileList | null) {
@@ -112,15 +118,23 @@ export default function App() {
     requestAnimationFrame(() => { textRef.current?.focus(); window.scrollTo({ top: 0, behavior: 'instant' }); });
   }
 
+  function printRecipe(saveAsPdf = false) {
+    if (!canExport) { setToast(s.unsafeExport); return; }
+    if (saveAsPdf) setToast(s.savePdfHint);
+    window.print();
+  }
+
   const outputText = () => {
     const r = tab === 'converted' && conversion ? conversion.recipe : original;
     const notice = tab === 'converted' && conversion && original ? `\n\n${adaptationText(original, s)}` : '';
     return r ? renderRecipe(r) + notice + `\n\n${s.appName} · bakinggreatbread.blog` : '';
   };
   async function copy() {
+    if (!canExport) { setToast(s.unsafeExport); return; }
     try { await navigator.clipboard.writeText(outputText()); setToast(s.copied); } catch { /* ignore */ }
   }
   async function share() {
+    if (!canExport) { setToast(s.unsafeExport); return; }
     const body = outputText();
     if (navigator.share) { try { await navigator.share({ title: original?.title ?? s.appName, text: body }); } catch { /* cancelled */ } }
     else copy();
@@ -145,9 +159,12 @@ export default function App() {
           <span className="brand-divider" />
           <span className="brand-tool">{s.shortName}</span>
         </div>
-        <div className="seg" aria-label="Language">
+        <div className="header-utility">
+          <span className="build-label" title={`Version ${__APP_VERSION__}, build ${__BUILD_ID__}`}>v{__APP_VERSION__} <span className="build-revision">· {__BUILD_ID__}</span></span>
+          <div className="seg" aria-label="Language">
           <button aria-pressed={lang === 'en'} onClick={() => setLangChoice('en')}>EN</button>
           <button aria-pressed={lang === 'es'} onClick={() => setLangChoice('es')}>ES</button>
+          </div>
         </div>
       </header>
 
@@ -259,7 +276,18 @@ export default function App() {
               </div>
             )}
 
-            <section className="card recipe-result">
+            <div className="result-toolbar" role="group" aria-label={s.exportActions}>
+              <button className="btn secondary" onClick={() => printRecipe()} disabled={!canExport}><Icon name="print" />{s.print}</button>
+              <button className="btn secondary" onClick={() => printRecipe(true)} disabled={!canExport}><Icon name="download" />{s.savePdf}</button>
+            </div>
+            {tab === 'converted' && safetyIssues.length > 0 && <section className="card error-card export-warning" role="alert">
+              <h2>{s.unsafeTitle}</h2>
+              <p>{s.unsafeHint}</p>
+              <ul>{safetyIssues.map((issue, i) => <li key={i}>{issue}</li>)}</ul>
+              <p>{s.unsafeExport}</p>
+            </section>}
+            <section className="card recipe-result" id="printable-recipe">
+              <div className="print-heading"><strong>{s.academy}</strong><span>{s.appName} · v{__APP_VERSION__}</span></div>
               {tab === 'converted' && conversion ? (
                 <>
                   {original.title && <h2 className="recipe-title">{original.title}</h2>}
@@ -274,7 +302,7 @@ export default function App() {
                       <b>{s.yeastAmount}:</b> {s.instant} {conversion.yeast.instant}g · {s.activeDry} {conversion.yeast.activeDry}g · {s.fresh} {conversion.yeast.fresh}g ({conversion.yeast.pct}%)
                     </div></div>
                   )}
-                  <RecipeView recipe={conversion.recipe} s={s} highlightChanges />
+                  <RecipeView recipe={conversion.recipe} s={s} highlightChanges showSteps={safetyIssues.length === 0} />
                 </>
               ) : (
                 <>
@@ -303,8 +331,8 @@ export default function App() {
               <button className="btn secondary" onClick={editRecipe} aria-label={s.backToStart}>{s.back}</button>
               {original && original.components.length > 0 && <>
               <button className="btn secondary" onClick={() => setSheet(true)}><Icon name="tune" />{s.options}</button>
-              <button className="btn secondary" onClick={copy}><Icon name="copy" />{s.copy}</button>
-              <button className="btn primary-wide" onClick={share}><Icon name="share" />{s.share}</button>
+              <button className="btn secondary" onClick={copy} disabled={!canExport}><Icon name="copy" />{s.copy}</button>
+              <button className="btn primary-wide" onClick={share} disabled={!canExport}><Icon name="share" />{s.share}</button>
               </>}
             </>
           )}

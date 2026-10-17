@@ -17,7 +17,7 @@ export function Stats({ a, s }: { a: Analysis; s: Strings }) {
   );
 }
 
-export function RecipeView({ recipe, s, highlightChanges }: { recipe: Recipe; s: Strings; highlightChanges?: boolean }) {
+export function RecipeView({ recipe, s, highlightChanges, showSteps = true }: { recipe: Recipe; s: Strings; highlightChanges?: boolean; showSteps?: boolean }) {
   const a = analyze(recipe);
   return (
     <>
@@ -40,7 +40,7 @@ export function RecipeView({ recipe, s, highlightChanges }: { recipe: Recipe; s:
           </div>
         </div>
       ))}
-      {recipe.steps.length > 0 && (
+      {showSteps && recipe.steps.length > 0 && (
         <div className="section">
           <h3>{s.method}</h3>
           <ol className="steps">

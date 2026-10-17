@@ -10,6 +10,8 @@ const paths = {
   share: 'M12 15V3m-4 4 4-4 4 4M5 12v9h14v-9',
   tune: 'M4 6h4m4 0h8M4 12h10m4 0h2M4 18h2m4 0h10M8 3v6m6 0v6M6 15v6',
   close: 'm6 6 12 12M18 6 6 18',
+  print: 'M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6zM18 12h.01',
+  download: 'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',
 } as const;
 
 export function Icon({ name, style }: { name: keyof typeof paths; style?: CSSProperties }) {
