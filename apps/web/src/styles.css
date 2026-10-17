@@ -249,6 +249,9 @@ pre.plain { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--m
 .export-warning { border: 1px solid #ba6245; background: #fff5ee; color: #74321c; }
 .export-warning h2 { font: 600 22px/1.35 var(--sans, sans-serif); }
 .export-warning ul { margin: 12px 0; padding-left: 24px; line-height: 1.65; }
+@media (max-width: 420px) {
+  .topbar .brand-name { display: none; }
+}
 @media (max-width: 480px) {
   .result-toolbar { justify-content: stretch; }
   .result-toolbar .btn { flex: 1; min-width: 0; padding: 10px 12px; }
