@@ -9,6 +9,9 @@ import { OptionsSheet, DEFAULT_OPTIONS, type Options } from './components/Option
 import { Icon } from './components/Icon';
 import { AdaptationNotice, adaptationText } from './components/AdaptationNotice';
 
+declare const __APP_VERSION__: string;
+declare const __BUILD_ID__: string;
+
 type Direction = 'to-sourdough' | 'to-yeast';
 
 const KEY = 'syc:v2';
@@ -145,9 +148,12 @@ export default function App() {
           <span className="brand-divider" />
           <span className="brand-tool">{s.shortName}</span>
         </div>
-        <div className="seg" aria-label="Language">
+        <div className="header-utility">
+          <span className="build-label" title={`Version ${__APP_VERSION__}, build ${__BUILD_ID__}`}>v{__APP_VERSION__} <span className="build-revision">· {__BUILD_ID__}</span></span>
+          <div className="seg" aria-label="Language">
           <button aria-pressed={lang === 'en'} onClick={() => setLangChoice('en')}>EN</button>
           <button aria-pressed={lang === 'es'} onClick={() => setLangChoice('es')}>ES</button>
+          </div>
         </div>
       </header>
 
