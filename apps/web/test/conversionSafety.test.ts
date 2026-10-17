@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Recipe } from '@bgb/dough-core';
 import { conversionSafety } from '../src/conversionSafety';
+import { convertToYeast, convertToSourdough, parseRecipeText } from '@bgb/dough-core';
 
 const base = (steps: string[], yeast = 6.5): Recipe => ({
   title: 'Cranberry Walnut Bread',
@@ -43,4 +44,42 @@ describe('conversion safety blocks misleading adapted methods', () => {
   it('does not confuse oven temperatures with ingredient quantities', () => {
     expect(conversionSafety(base(['Preheat to 450°F. Bake covered for 20 minutes, then at 425°F.']), 'to-yeast')).toEqual([]);
   });
+  it('allows printing the corrected PDF-style sourdough-to-yeast conversion', () => {
+    const original = parseRecipeText([
+      'Cranberry Walnut Bread', 'Levain', '50g sourdough starter', '100g water', '100g bread flour',
+      'Dough', 'all of the levain', '375g water', '500g bread flour', '10g salt',
+      '75g cranberries', '75g walnuts', 'Instructions',
+      '1. Build Your Levain', '2. Mix 50g starter with 100g water and 100g flour overnight.',
+      '3. Prepare Inclusions', '4. Toast walnuts.',
+      '5. Mix the Dough', '6. Combine 250g levain and 375g water.', '7. Add 500g bread flour.',
+      '8. Add Salt and Build Strength', '9. Sprinkle 10g salt.',
+      '10. Bulk Fermentation', '11. Ferment 4 hours.',
+      '12. Shape Your Loaf', '13. Pre-shape then shape.',
+      '14. Cold Proof', '15. Refrigerate 12 hours.',
+      '16. Bake Your Loaf', '17. Preheat Dutch oven to 450°F.',
+      '18. Score loaf and bake covered for 20 minutes.',
+    ].join('\n')).recipe;
+    const adapted = convertToYeast(original).recipe;
+    expect(conversionSafety(adapted, 'to-yeast')).toEqual([]);
+    expect(adapted.steps.map(st => st.text).join(' ')).not.toMatch(/50g yeast|250g yeast|250g levain/);
+  });
+
+  it('allows printing the corrected yeasted-to-sourdough conversion', () => {
+    const source = parseRecipeText([
+      'Cranberry Walnut Bread', 'Dough', '500g bread flour', '350g water', '10g salt', '2g instant yeast',
+      '75g cranberries', '75g walnuts', 'Instructions',
+      '1. Prepare Inclusions', '2. Toast walnuts.',
+      '3. Mix the Dough', '4. Stir 2g yeast into 350g water; add 500g flour.',
+      '5. Add Salt and Build Strength', '6. Sprinkle 10g salt.',
+      '7. Bulk Fermentation', '8. Bulk ferment 1 hour.',
+      '9. Shape Your Loaf', '10. Shape a boule.',
+      '11. Cold Proof', '12. Refrigerate overnight.',
+      '13. Bake Your Loaf', '14. Preheat Dutch oven to 450°F.',
+      '15. Score and bake.',
+    ].join('\n')).recipe;
+    const adapted = convertToSourdough(source).recipe;
+    expect(conversionSafety(adapted, 'to-sourdough')).toEqual([]);
+    expect(adapted.steps.map(st => st.text).join(' ')).toMatch(/400g bread flour/);
+  });
+
 });
