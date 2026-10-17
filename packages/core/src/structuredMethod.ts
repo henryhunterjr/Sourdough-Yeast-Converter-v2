@@ -68,7 +68,7 @@ function levainDescription(recipe: Recipe, language: 'en' | 'es'): string {
     '. Cover loosely and let ripen until bubbly and domed, usually 8–12 hours at 75–78°F (24–26°C). Yield: about ' + g(total) + '.';
 }
 
-function mixMethod(recipe: Recipe, direction: Direction, hasSaltStage: boolean, sourceMix: Step[], lang: 'en' | 'es'): Step[] {
+function mixMethod(recipe: Recipe, direction: Direction, hasSaltStage: boolean, hasFoldStage: boolean, sourceMix: Step[], lang: 'en' | 'es'): Step[] {
   const flour = relevantIngredients(recipe, 'flour');
   const liquid = relevantIngredients(recipe, 'liquid');
   const dairy = relevantIngredients(recipe, 'dairy');
@@ -94,7 +94,7 @@ function mixMethod(recipe: Recipe, direction: Direction, hasSaltStage: boolean, 
     if (extras.length) out.push(added('Incorpora ' + joinIngredients(extras) + ' como indique la receta, sin mezclar en exceso.'));
     if (!hasSaltStage && salt.length) out.push(added('Añade ' + joinIngredients(salt) + ' y trabaja la masa hasta integrar la sal.'));
     if (rest > 0) out.push(added('Cubre y deja reposar ' + rest + ' minutos antes de seguir con los pliegues o el amasado.'));
-    if (additions.length && !/\bfolds?|pliegues|inclusion/i.test(state)) out.push(added('Añade ' + joinIngredients(additions) + ' cuando la masa tenga algo de fuerza; incorpóralos suavemente.'));
+    if (additions.length && !hasFoldStage && !/\bfolds?|pliegues|inclusion/i.test(state)) out.push(added('Añade ' + joinIngredients(additions) + ' cuando la masa tenga algo de fuerza; incorpóralos suavemente.'));
     return out;
   }
 
@@ -108,7 +108,7 @@ function mixMethod(recipe: Recipe, direction: Direction, hasSaltStage: boolean, 
   if (extras.length) out.push(added('Incorporate ' + joinIngredients(extras) + ' using the original recipe’s handling order. Avoid overmixing.'));
   if (!hasSaltStage && salt.length) out.push(added('Add ' + joinIngredients(salt) + ' and mix until fully incorporated.'));
   if (rest > 0) out.push(added('Cover and let the dough rest for ' + rest + ' minutes before the next strength-building step.'));
-  if (additions.length && !/\bfolds?|inclusion/i.test(state)) out.push(added('After the dough develops some strength, gently fold in ' + joinIngredients(additions) + '.'));
+  if (additions.length && !hasFoldStage && !/\bfolds?|inclusion/i.test(state)) out.push(added('After the dough develops some strength, gently fold in ' + joinIngredients(additions) + '.'));
   return out;
 }
 
@@ -147,7 +147,7 @@ function preserveSafe(st: Step, direction: Direction): Step | null {
   // ingredient weights. They cannot be trusted in a different formula.
   if (/(\d+(?:[.,]\d+)?)\s*g(?:rams?)?\s+(?:yeast|levain|starter|flour|water)\b/i.test(text)) return null;
   if (direction === 'to-yeast') {
-    text = text.replace(/\bLeave the loaf in the fridge until you(?:'re| are) ready to load it\.?/gi, 'Keep the shaped loaf covered while the oven heats.');
+    text = text.replace(/\bLeave the loaf in the fridge until (?:(?:you(?:'re| are) )?ready to load it)\.?/gi, 'Keep the shaped loaf covered while the oven heats.');
     text = text.replace(/\b(?:cold loaf|refrigerated loaf)\b/gi, 'proofed loaf');
     text = text.replace(/\b(?:cold dough|refrigerated dough)\b/gi, 'proofed dough');
     if (/\b(?:levain|sourdough starter|starter culture|feed your starter)\b/i.test(text)) return null;
@@ -178,7 +178,7 @@ export function composeStructuredMethod(source: Recipe, converted: Recipe, direc
   for (const section of parts) {
     if (section.stage === 'levain') continue; // Entire source build AND its nested steps.
     if (section.stage === 'mix') {
-      out.push(...mixMethod(converted, direction, saltStage, section.steps, lang));
+      out.push(...mixMethod(converted, direction, saltStage, stages.has('fold'), section.steps, lang));
     } else if (section.stage === 'bulk') {
       out.push(...bulkMethod(direction, lang));
     } else if (section.stage === 'proof') {
