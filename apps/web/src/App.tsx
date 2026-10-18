@@ -9,6 +9,7 @@ import { OptionsSheet, DEFAULT_OPTIONS, type Options } from './components/Option
 import { Icon } from './components/Icon';
 import { AdaptationNotice, adaptationText } from './components/AdaptationNotice';
 import { conversionSafety } from './conversionSafety';
+import { analytics } from './analytics';
 
 declare const __APP_VERSION__: string;
 declare const __BUILD_ID__: string;
@@ -105,9 +106,19 @@ export default function App() {
     abort.current?.abort();
     const ac = new AbortController(); abort.current = ac;
     setBusy(true); setRead(null); setTab('converted');
+    analytics.convert({ input: document ? 'pdf' : images.length ? 'photo' : 'paste', direction: dirChoice, language: lang });
     try {
       const r = await readRecipe({ text, images: images.map(i => ({ data: i.data, mediaType: i.mediaType })) }, hydration, ac.signal);
-      if (!ac.signal.aborted) { setRead(r); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+      if (!ac.signal.aborted) {
+        setRead(r); window.scrollTo({ top: 0, behavior: 'smooth' });
+        const rec = r.recipe;
+        if (rec.components.length) {
+          const dir: Direction = dirChoice !== 'auto' ? dirChoice : analyze(rec).leavening === 'sourdough' ? 'to-yeast' : 'to-sourdough';
+          let blocked = sanityCheck(rec).some(c => c.level === 'error');
+          if (!blocked) { try { const c = dir === 'to-sourdough' ? convertToSourdough(rec) : convertToYeast(rec); blocked = conversionSafety(c.recipe, dir).length > 0; } catch { blocked = true; } }
+          analytics.result({ source: r.source, direction: dir, blocked, language: rec.language ?? 'en' });
+        }
+      }
     } catch (e) { if ((e as Error).name !== 'AbortError') setToast((e as Error).message); }
     finally { if (!ac.signal.aborted) setBusy(false); }
   }
@@ -120,6 +131,7 @@ export default function App() {
 
   function printRecipe(saveAsPdf = false) {
     if (!canExport) { setToast(s.unsafeExport); return; }
+    analytics.export({ action: saveAsPdf ? 'pdf' : 'print', direction, tab });
     if (saveAsPdf) setToast(s.savePdfHint);
     window.print();
   }
@@ -131,10 +143,12 @@ export default function App() {
   };
   async function copy() {
     if (!canExport) { setToast(s.unsafeExport); return; }
+    analytics.export({ action: 'copy', direction, tab });
     try { await navigator.clipboard.writeText(outputText()); setToast(s.copied); } catch { /* ignore */ }
   }
   async function share() {
     if (!canExport) { setToast(s.unsafeExport); return; }
+    analytics.export({ action: 'share', direction, tab });
     const body = outputText();
     if (navigator.share) { try { await navigator.share({ title: original?.title ?? s.appName, text: body }); } catch { /* cancelled */ } }
     else copy();
