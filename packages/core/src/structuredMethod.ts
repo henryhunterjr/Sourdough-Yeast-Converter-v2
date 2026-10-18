@@ -117,7 +117,13 @@ function mixMethod(recipe: Recipe, direction: Direction, hasSaltStage: boolean, 
  * temperature determine the true duration, not an arbitrary division of
  * the source recipe's clock times.
  */
-function bulkMethod(direction: Direction, lang: 'en' | 'es'): Step[] {
+function bulkMethod(direction: Direction, lang: 'en' | 'es', afterFolds = false): Step[] {
+  // A sourdough schedule's rests and folds can run three hours or more. Yeast
+  // starts working the moment it's mixed in, so those folds are already bulk
+  // time and the clock runs from mixing, not from the end of the folds.
+  if (direction === 'to-yeast' && afterFolds) return lang === 'es'
+    ? [added('Fermentación en bloque: cuenta desde que mezclaste la levadura, porque los reposos y pliegues ya son parte de ella. Suele estar lista entre 1½ y 2½ horas después de mezclar a 24–26°C. Busca una masa hinchada, con burbujas y alrededor de 50–75% más de volumen. Guíate por la masa, no por el reloj.')]
+    : [added('Bulk fermentation: Count from when you mixed in the yeast, because the rests and folds above are already part of it. At 75 to 78°F (24 to 26°C) it\'s usually ready 1½ to 2½ hours after mixing. Look for a puffy dough with bubbles and roughly 50 to 75% more volume. Go by the dough, not the clock.')];
   if (lang === 'es') return direction === 'to-yeast'
     ? [added('Fermenta la masa tapada a temperatura ambiente. Empieza a revisarla después de 60–90 minutos: debe estar más aireada, con burbujas y un aumento visible de volumen. El tiempo cambia con la temperatura y la dosis de levadura.')]
     : [added('Deja fermentar la masa madre tapada. Empieza a revisarla después de 3–4 horas, pero guíate por el aumento de volumen, las burbujas y la tensión de la masa. El tiempo depende de la temperatura y la fuerza del levain.')];
@@ -175,12 +181,19 @@ export function composeStructuredMethod(source: Recipe, converted: Recipe, direc
 
   const saltStage = stages.has('salt');
   const hasProof = stages.has('proof');
+  const hasFolds = stages.has('fold');
+  // A printed section ("Add Salt and Develop Strength") can contain its own
+  // "Add salt" sub-step, which reads as a second salt section. Only add a salt
+  // line when no salt section anywhere already tells the baker to add it.
+  const saltAlreadyAdded = parts.some(p => p.stage === 'salt' && p.steps.some(st => /\b(?:add|sprinkle|incorporate|mix in)\b[^.]{0,30}\bsalt\b|\bsalt\b[^.]{0,20}\b(?:over|into)\b|\b(?:añade|agrega|incorpora|espolvorea)\b[^.]{0,30}\bsal\b/i.test(st.text)));
+  let saltLineAdded = false;
+  let foldNoteAdded = false;
   for (const section of parts) {
     if (section.stage === 'levain') continue; // Entire source build AND its nested steps.
     if (section.stage === 'mix') {
       out.push(...mixMethod(converted, direction, saltStage, stages.has('fold'), section.steps, lang));
     } else if (section.stage === 'bulk') {
-      out.push(...bulkMethod(direction, lang));
+      out.push(...bulkMethod(direction, lang, hasFolds));
     } else if (section.stage === 'proof') {
       if (!seen.has('proof')) out.push(...proofMethod(direction, section.steps, lang));
     } else if (section.stage === 'other') {
@@ -193,13 +206,19 @@ export function composeStructuredMethod(source: Recipe, converted: Recipe, direc
         }
       }
     } else {
+      if (section.stage === 'fold' && direction === 'to-yeast' && !foldNoteAdded) {
+        foldNoteAdded = true;
+        out.push(added(lang === 'es'
+          ? 'La levadura trabaja más rápido que la masa madre. Empieza a revisar la masa unos 90 minutos después de mezclar. Si ya está hinchada y ha crecido alrededor de 50% antes de terminar los pliegues, omite los que falten y pasa a formar.'
+          : 'Yeast works faster than sourdough. Start checking the dough about 90 minutes after mixing. If it\'s already puffy and up about 50% before you finish these folds, skip the rest and move on to shaping.'));
+      }
       for (const step of section.steps) {
         const safe = preserveSafe(step, direction);
         if (safe) out.push(safe);
       }
-      if (section.stage === 'salt' && !section.steps.some(st => /add\s+salt|sprinkle/i.test(st.text))) {
+      if (section.stage === 'salt' && !saltAlreadyAdded && !saltLineAdded) {
         const salt = relevantIngredients(converted, 'salt');
-        if (salt.length) out.push(added((lang === 'es' ? 'Incorpora ' : 'Add ') + joinIngredients(salt) + (lang === 'es' ? ' a la masa.' : ' to the dough.')));
+        if (salt.length) { saltLineAdded = true; out.push(added((lang === 'es' ? 'Incorpora ' : 'Add ') + joinIngredients(salt) + (lang === 'es' ? ' a la masa.' : ' to the dough.'))); }
       }
     }
     seen.add(section.stage);

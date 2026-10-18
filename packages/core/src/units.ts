@@ -81,6 +81,8 @@ export function parseAmount(raw: string): ParsedAmount | null {
   const text = raw.trim();
   let line = text
     .replace(/^[-•*·]\s*/, '')
+    // "~250g levain", "≈ 250 g", "about 250g", "aprox. 250 g": the number is still the amount.
+    .replace(/^(?:~|≈|about\s+|approx\.?\s+|approximately\s+|aprox\.?\s+|aproximadamente\s+)\s*(?=\d|[½⅓⅔¼¾⅛⅜⅝⅞])/i, '')
     .replace(/\s+/g, ' ');
 
   // 1) Explicit grams in parentheses win: "1 cup (120g) flour", "1 large egg (50g)".

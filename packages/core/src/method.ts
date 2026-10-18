@@ -189,10 +189,26 @@ export function editMethodToYeast(
   const out: Step[] = [{ text: intro, changed: 'added' }];
   let risesSeen = 0;
   let touchedTimes = false;
+  // A printed recipe can put "BUILD LEVAIN (NIGHT BEFORE)" on its own line with
+  // the build directions in the paragraph under it. Once that title is
+  // removed, the paragraphs under it go too, up to the next section title.
+  const isSectionTitle = (x: string) => x.trim().length <= 48 && !/[.!?;]$/.test(x.trim()) && !/\d+\s*g\b/i.test(x);
+  let inLevainBuild = false;
 
   for (const s of steps) {
     let changed: Step['changed'] = 'kept';
     let note: string | undefined;
+
+    if (inLevainBuild) {
+      if (isSectionTitle(s.text) && !LEVAIN_BUILD.test(s.text)) inLevainBuild = false;
+      else if (/\b(levain|starter|masa madre)\b/i.test(s.text) || isSectionTitle(s.text)) {
+        // Already covered by the one "no longer needed" line; keep the removed text in its note.
+        const prev = out[out.length - 1]!;
+        prev.note = `${prev.note ? prev.note + ' ' : ''}Removed: "${s.text}"`;
+        continue;
+      }
+      else inLevainBuild = false;
+    }
 
     let text = s.text.split(SENTENCE_SPLIT).map(sentence => {
       if (LEVAIN_BUILD.test(sentence)) { changed = 'edited'; note = `Removed: "${sentence}"`; return t.removedBuild; }
@@ -209,7 +225,7 @@ export function editMethodToYeast(
       return sentence;
     }).join(' ');
     // A step that was only the levain build collapses to the note.
-    if (text === t.removedBuild) { out.push({ text, changed: 'edited', note }); continue; }
+    if (text === t.removedBuild) { if (isSectionTitle(s.text)) inLevainBuild = true; out.push({ text, changed: 'edited', note }); continue; }
     if (RISE_WORDS.test(text)) {
       const factor = 1 / (risesSeen === 0 ? firstRise : finalProof);
       const r = rescaleRiseClauses(text, factor);

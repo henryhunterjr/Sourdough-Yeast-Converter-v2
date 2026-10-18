@@ -13,7 +13,7 @@ describe('Pantry PDFs (deterministic responses, no actual AI/OCR)', () => {
     expect(seen).not.toContain("Baker's %");
     expect(seen).not.toContain('levain subtotal');
     expect(r.recipe.components.flatMap(c=>c.ingredients)).toHaveLength(22);
-    expect(r.recipe.steps).toHaveLength(8);
+    expect(r.recipe.steps).toHaveLength(16); // section titles are their own steps
     expect(r.recipe.sourceNotes?.join(' ')).toContain('Tangzhong Detected');
     expect(r.flags.some(f=>f.message.includes('169g'))).toBe(true);
   });

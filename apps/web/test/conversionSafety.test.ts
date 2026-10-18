@@ -97,3 +97,12 @@ describe('plain pasted sourdough recipes convert to yeast without tripping the g
     });
   }
 });
+
+describe('Recipe Pantry Cranberry Walnut print converts to yeast without tripping the gate (Oct 18 launch test)', () => {
+  it('passes the print/share safety check', async () => {
+    const { readFileSync } = await import('node:fs');
+    const text = readFileSync(new URL('../../../packages/core/test/fixtures/pantry-pdf/cranberry-walnut-print.txt', import.meta.url), 'utf8');
+    const y = convertToYeast(parseRecipeText(text, 100).recipe).recipe;
+    expect(conversionSafety(y, 'to-yeast')).toEqual([]);
+  });
+});

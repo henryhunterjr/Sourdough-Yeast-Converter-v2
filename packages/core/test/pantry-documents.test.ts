@@ -10,7 +10,9 @@ describe('actual PDF text and matching Pantry export formats', () => {
     expect(recipe.components.map(c => [c.name, c.ingredients.length])).toEqual([['Levain / Starter', 3], ['Dough', 19]]);
     expect(recipe.components[0]!.ingredients.map(i => i.grams)).toEqual([38, 77, 54]);
     expect(recipe.components[1]!.ingredients.map(i => i.grams)).toEqual([23,192,269,115,116,58,50,50,88,8,56,130,14,1,115,40,60,4,10]);
-    expect(recipe.steps).toHaveLength(8);
+    // Each section title ("BULK FERMENTATION") is its own step, ahead of its paragraph.
+    expect(recipe.steps).toHaveLength(16);
+    expect(recipe.steps[6]!.text).toBe('BULK FERMENTATION');
     expect(recipe.steps.at(-1)!.text).toContain('Cool on wire rack');
     expect(recipe.steps.map(s => s.text).join(' ')).not.toContain('Substitutions');
     expect(recipe.sourceNotes?.join(' ')).toContain('Tangzhong Detected');

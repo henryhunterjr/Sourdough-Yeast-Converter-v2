@@ -20,7 +20,7 @@ export interface ParseResult {
 const METHOD_HEADING = /^\s*(instructions?|directions?|method|steps|preparation|procedure|how to make|instrucciones|m[eé]todo|pasos|preparaci[oó]n|elaboraci[oó]n|procedimiento)\s*:?\s*$/i;
 const INGREDIENT_HEADING = /^\s*(ingredients?|ingredientes)\s*:?\s*$/i;
 const METADATA = /^\s*(prep|cook|bake|total|rise|rest|yield|servings?|makes|serves|time|temperature|category|cuisine|difficulty|calories|author|by|tiempo|porciones?|rinde|rendimiento|dificultad|autor)\b[^a-z]*[:\d]/i;
-const REFERENCE = /\b(all of the|all the|the) (levain|preferment|poolish|biga|starter)\b|\(from above\)|from step|levain from|todo el (levain|prefermento)|de arriba|del paso/i;
+const REFERENCE = /\b(all of the|all the|the) (levain|preferment|poolish|biga|starter)\b|\b(levain|preferment|poolish|biga)\b\s*\((?:all(?: of it)?|todo)\)|\(from above\)|from step|levain from|todo el (levain|prefermento)|de arriba|del paso/i;
 const OPTIONAL = /\boptional\b|\bopcional\b/i;
 /** A bare section word is a heading even on the first line; "Pan de masa madre" is a title. */
 const SECTION_WORD = /^(levain|starter|preferment|pre-ferment|poolish|biga|sponge|tangzhong|yudane|soaker|dough|main dough|final dough|filling|frosting|icing|glaze|topping|egg wash|pan|for the pan|masa|masa madre|prefermento|relleno|cobertura|glaseado|bet[uú]n|molde)( build| section)?\s*:?\s*$/i;
@@ -153,16 +153,26 @@ export function parseRecipeText(text: string, starterHydration = 100): ParseResu
     if (first) first.kind = 'dough';
   }
 
+  // Section titles ("Mix the Dough", "Bulk Fermentation") stay their own steps,
+  // even when a printed recipe puts a paragraph straight under them. The
+  // structured method needs to see them to rebuild a sectioned recipe.
+  const isTitle = (t: string) => looksLikeHeading(t) && !/[.!?;]$/.test(t.trim());
   const steps: Step[] = [];
   let buffer = '';
+  let bufferIsTitle = false;
+  const flush = () => { if (buffer) steps.push({ text: buffer }); buffer = ''; bufferIsTitle = false; };
   for (const raw of methodLines) {
     const line = raw.trim();
-    if (!line) { if (buffer) { steps.push({ text: buffer }); buffer = ''; } continue; }
+    if (!line) { flush(); continue; }
     const numbered = /^(\d+[.)]|step \d+[.:]?|paso \d+[.:]?)\s+/i.test(line);
-    if (numbered && buffer) { steps.push({ text: buffer }); buffer = ''; }
-    buffer = (buffer ? buffer + ' ' : '') + line.replace(/^(\d+[.)]|step \d+[.:]?|paso \d+[.:]?)\s+/i, '');
+    const body = line.replace(/^(\d+[.)]|step \d+[.:]?|paso \d+[.:]?)\s+/i, '');
+    const startsSentence = /^[A-ZÁÉÍÓÚÑ¿¡]/.test(body);
+    const bufferDone = /[.!?)]$/.test(buffer);
+    if (buffer && (numbered || (bufferIsTitle && startsSentence) || (isTitle(body) && bufferDone))) flush();
+    if (!buffer) bufferIsTitle = isTitle(body);
+    buffer = (buffer ? buffer + ' ' : '') + body;
   }
-  if (buffer) steps.push({ text: buffer });
+  flush();
 
   const recipe: Recipe = { title, components, steps, starterHydration, language };
   if (document.sourceNotes.length) recipe.sourceNotes = document.sourceNotes;

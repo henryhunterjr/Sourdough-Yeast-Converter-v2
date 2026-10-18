@@ -7,6 +7,7 @@ Local copies of Henry's sources, retained for upload regression checks:
 | `einkorn-table.pdf` | `Einkorn_Spelt_Cinnamon_Rolls_BGB_YeastToSourdough.pdf` | 11,538 | `172cc7fff2d4b31b789422e3ccba4628e83bd83a9e46bc5cbcc77cb99cad414d` |
 | `cranberry-one-sheet.pdf` | `cranberry-orange-loaf-yeasted-one-sheet-high.pdf` | 3,678,777 | `0fe72883acd63938bc37add912a717a9605b423c83c4df7725c466a571efe836` |
 | `pantry-print.pdf` | `Einkorn & Spelt Cinnamon Rolls _ Baking Great Bread - Print Version _ Recipe Pantry.pdf` | 626,188 | `28b11113d511d4a7f25fe7d07d8d7c9b49947aa158e935a5d4db5f32afe93704` |
+| `cranberry-walnut-print.pdf` | `Cranberry_Walnut_Bread_-_Print_Version___Recipe_Pantry.pdf` | 478,846 | `d674500f28290377d9673858baa6a1d77cafc5bc23719bf4037ec20a86192478` |
 
 The first two correspond to the actual supplied PDF attachments, found in
 Henry's local Recipe Pantry folder with matching names and byte sizes. The third
