@@ -109,3 +109,22 @@ describe('display preservation with deterministic provider fixtures', () => {
     expect(body).not.toHaveProperty('temperature');
   });
 });
+
+describe('long Pantry prints no longer get cut off (Oct 18 work order, item 4)', () => {
+  it('asks for enough output tokens and reports a cut-off answer instead of returning half-written JSON', async () => {
+    const { MAX_OUTPUT_TOKENS, ProviderError } = await import('../src/providers.js');
+    let body: Record<string, unknown> = {};
+    const ok = anthropicProvider({ apiKey: 'test-placeholder', fetchImpl: async (_url, init) => {
+      body = JSON.parse(String(init?.body));
+      return Response.json({ content: [{ type: 'text', text: '{}' }], stop_reason: 'end_turn' });
+    } });
+    await ok.read({ text: '500g flour' });
+    expect(body.max_tokens).toBe(MAX_OUTPUT_TOKENS);
+    expect(MAX_OUTPUT_TOKENS).toBeGreaterThanOrEqual(12000);
+
+    const cut = anthropicProvider({ apiKey: 'test-placeholder', fetchImpl: async () =>
+      Response.json({ content: [{ type: 'text', text: '{"title":"Cranberry' }], stop_reason: 'max_tokens' }) });
+    await expect(cut.read({ text: '500g flour' })).rejects.toBeInstanceOf(ProviderError);
+    await expect(cut.read({ text: '500g flour' })).rejects.toThrow(/cut off/);
+  });
+});

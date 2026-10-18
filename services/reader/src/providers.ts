@@ -13,6 +13,9 @@ export interface Provider {
   read(input: ReadInput): Promise<string>;
 }
 
+/** Room for the longest Pantry print (ingredients, 40 steps, transcript of a scanned page). */
+export const MAX_OUTPUT_TOKENS = 16384;
+
 const userText = (input: ReadInput) =>
   input.images?.length
     ? `Read the recipe in ${input.images.length > 1 ? 'these images' : 'this image'} and return the JSON object. Transcribe the text faithfully into "transcript".${input.text ? `\n\nAdditional text:\n${input.text}` : ''}`
@@ -36,14 +39,20 @@ export function anthropicProvider(opts: { apiKey: string; model?: string; fetchI
         },
         body: JSON.stringify({
           model,
-          max_tokens: 4096,
+          // A long Recipe Pantry print is 30+ steps of JSON; 4,096 cut it off
+          // mid-object and the app fell back to the parser with a warning.
+          max_tokens: MAX_OUTPUT_TOKENS,
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content }],
           output_config: { format: { type: 'json_schema', schema: READ_RECIPE_JSON_SCHEMA } },
         }),
       });
       if (!res.ok) throw new ProviderError(`Anthropic ${res.status}: ${await safeText(res)}`, res.status);
-      const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+      const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; stop_reason?: string };
+      if (data.stop_reason === 'max_tokens') {
+        console.warn(`[reader] Anthropic output hit max_tokens (${MAX_OUTPUT_TOKENS}); the JSON is incomplete`);
+        throw new ProviderError(`Anthropic answer was cut off at ${MAX_OUTPUT_TOKENS} tokens`, 502);
+      }
       const block = data.content?.find(b => b.type === 'text');
       if (!block?.text) throw new ProviderError('Anthropic returned no text block', 502);
       return block.text;
@@ -69,13 +78,18 @@ export function geminiProvider(opts: { apiKey: string; model?: string; fetchImpl
           contents: [{ role: 'user', parts }],
           generationConfig: {
             temperature: 0,
+            maxOutputTokens: MAX_OUTPUT_TOKENS,
             responseMimeType: 'application/json',
             responseJsonSchema: READ_RECIPE_JSON_SCHEMA,
           },
         }),
       });
       if (!res.ok) throw new ProviderError(`Gemini ${res.status}: ${await safeText(res)}`, res.status);
-      const data = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+      const data = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }> };
+      if (data.candidates?.[0]?.finishReason === 'MAX_TOKENS') {
+        console.warn('[reader] Gemini output hit the token limit; the JSON is incomplete');
+        throw new ProviderError('Gemini answer was cut off at the token limit', 502);
+      }
       const out = data.candidates?.[0]?.content?.parts?.map(p => p.text ?? '').join('') ?? '';
       if (!out) throw new ProviderError('Gemini returned no text', 502);
       return out;
