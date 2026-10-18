@@ -301,7 +301,7 @@ export default function App() {
                   <AdaptationNotice original={original} s={s} />
                   {conversion.levain && (
                     <div className="flag info" style={{ marginBottom: 12 }}><span className="dot" /><div>
-                      <b>{s.levainBuild}:</b> {Math.round(conversion.levain.seed)}g starter + {Math.round(conversion.levain.flour)}g flour + {Math.round(conversion.levain.water)}g water = {Math.round(conversion.levain.total)}g ({conversion.levain.hydration}%, {conversion.levain.prefermentedFlourPct}% PFF)
+                      <b>{s.levainBuild}:</b> {Math.round(conversion.levain.seed)}g {s.levainStarter} + {Math.round(conversion.levain.flour)}g {s.levainFlour} + {Math.round(conversion.levain.water)}g {s.levainWater} = {Math.round(conversion.levain.total)}g ({conversion.levain.hydration}%, {conversion.levain.prefermentedFlourPct}% PFF)
                     </div></div>
                   )}
                   {conversion.yeast && (

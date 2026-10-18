@@ -132,8 +132,10 @@ export function convertToSourdough(input: Recipe, opts: ToSourdoughOptions = {})
   });
   recipe.components.unshift(levain);
 
-  if (a.richness !== 'lean' && levainHyd <= 65) notes.push({ level: 'info', message: `Enriched dough: the levain is built stiff (${levainHyd}%) to keep the flavor mild and the dough workable. Expect bulk fermentation to run 4 to 7 hours.` });
-  if (removedYeast.length === 0) notes.push({ level: 'info', message: 'No yeast was found to remove.' });
+  if (a.richness !== 'lean' && levainHyd <= 65) notes.push({ level: 'info', message: recipe.language === 'es'
+    ? `Masa enriquecida: el levain se prepara firme (${levainHyd}%) para mantener un sabor suave y una masa manejable. La fermentación en bloque suele tardar de 4 a 7 horas.`
+    : `Enriched dough: the levain is built stiff (${levainHyd}%) to keep the flavor mild and the dough workable. Expect bulk fermentation to run 4 to 7 hours.` });
+  if (removedYeast.length === 0) notes.push({ level: 'info', message: recipe.language === 'es' ? 'No se encontró levadura que quitar.' : 'No yeast was found to remove.' });
 
   recipe.steps = composeStructuredMethod(input, recipe, 'to-sourdough') ?? editMethodToSourdough(recipe.steps, {
     language: recipe.language ?? 'en',

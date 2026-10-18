@@ -92,7 +92,8 @@ describe('display preservation with deterministic provider fixtures', () => {
     for (const [n, expected] of [[1 / 4, '1/4'], [1 / 3, '1/3'], [1 / 2, '1/2'], [2 / 3, '2/3'], [3 / 4, '3/4'], [3.5, '3 1/2'], [1.25, '1 1/4']] as const) {
       expect(formatAmount(n)).toBe(expected);
     }
-    for (const n of [0.001, 1.009, 0.24, 0.32, 0.333, 0.49, 0.667, 1.23456789, 2.667]) {
+    // 0.333 and 0.667 are the model's rounded thirds and now display as fractions (item 9).
+    for (const n of [0.001, 1.009, 0.24, 0.32, 0.49, 1.23456789, 2.6]) {
       expect(formatAmount(n)).toBe(String(n));
       const line = { amount: n, unit: 'cups', name: 'bread flour', note: 'divided', role: 'flour', isReference: false, isFinishing: false } as const;
       expect(originalLine(line, '')).toBe(`${n} cups bread flour, divided`);
@@ -126,5 +127,21 @@ describe('long Pantry prints no longer get cut off (Oct 18 work order, item 4)',
       Response.json({ content: [{ type: 'text', text: '{"title":"Cranberry' }], stop_reason: 'max_tokens' }) });
     await expect(cut.read({ text: '500g flour' })).rejects.toBeInstanceOf(ProviderError);
     await expect(cut.read({ text: '500g flour' })).rejects.toThrow(/cut off/);
+  });
+});
+
+describe('backlog items 8 and 9 (Oct 18 work order)', () => {
+  it('shows ⅓-style fractions for the model\'s rounded decimals', () => {
+    expect(formatAmount(0.3333)).toBe('1/3');
+    expect(formatAmount(1.6667)).toBe('1 2/3');
+    expect(formatAmount(0.25)).toBe('1/4');
+    expect(formatAmount(0.3)).toBe('0.3');
+  });
+  it('names AI-read sections in Spanish on a Spanish recipe', async () => {
+    const { sectionName } = await import('../src/reader.js');
+    expect(sectionName('Dough', 'es')).toBe('Masa');
+    expect(sectionName('Filling', 'es')).toBe('Relleno');
+    expect(sectionName('Dough', 'en')).toBe('Dough');
+    expect(sectionName('Masa de brioche', 'es')).toBe('Masa de brioche');
   });
 });

@@ -182,7 +182,7 @@ export function toRecipe(read: ReadRecipe, sourceText: string, starterHydration:
   let finishing: Component | null = null;
 
   for (const c of read.components) {
-    const comp: Component = { kind: c.kind as ComponentKind, name: c.name, ingredients: [] };
+    const comp: Component = { kind: c.kind as ComponentKind, name: sectionName(c.name, read.language), ingredients: [] };
     for (const ri of c.ingredients) {
       const ing = toIngredient(ri, c, read.components, sourceText, flags, usedSourceLines);
       if (!ing) continue;
@@ -331,11 +331,23 @@ export function originalLine(ri: ReadIngredient, sourceText: string, usedLines =
 const FRACTIONS: Array<[number, string]> = [[1 / 8, '1/8'], [1 / 4, '1/4'], [1 / 3, '1/3'], [3 / 8, '3/8'], [1 / 2, '1/2'], [5 / 8, '5/8'], [2 / 3, '2/3'], [3 / 4, '3/4'], [7 / 8, '7/8']];
 
 /** 3.5 -> "3 1/2", 0.25 -> "1/4", 2 -> "2", 1.3 -> "1.3". */
+/** The model sometimes names sections in English on a Spanish recipe. */
+const SECTION_ES: Record<string, string> = {
+  dough: 'Masa', 'main dough': 'Masa', 'final dough': 'Masa final', levain: 'Levain', starter: 'Masa madre', preferment: 'Prefermento',
+  poolish: 'Poolish', biga: 'Biga', tangzhong: 'Tangzhong', soaker: 'Remojo', filling: 'Relleno', topping: 'Cobertura',
+  glaze: 'Glaseado', icing: 'Glaseado', frosting: 'Betún', 'egg wash': 'Para pintar', finishing: 'Para terminar',
+};
+export function sectionName(name: string, language: 'en' | 'es'): string {
+  if (language !== 'es') return name;
+  return SECTION_ES[name.trim().toLowerCase()] ?? name;
+}
+
 export function formatAmount(n: number): string {
   const whole = Math.floor(n), frac = n - whole;
   if (frac === 0) return String(whole);
-  // Allow floating-point representation error only; never round an arbitrary amount.
-  const hit = FRACTIONS.find(([v]) => Math.abs(v - frac) <= Number.EPSILON * Math.max(1, n) * 4);
+  // The model writes repeating fractions to a few decimals ("0.3333 cup"), so
+  // allow that much; anything further off is shown as the number it is.
+  const hit = FRACTIONS.find(([v]) => Math.abs(v - frac) <= 0.006);
   if (!hit) return String(n);
   return whole ? `${whole} ${hit[1]}` : hit[1];
 }

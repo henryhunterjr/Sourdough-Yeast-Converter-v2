@@ -54,3 +54,11 @@ describe('Oct 18 work order, item 2: two rises in one step count as bulk then pr
     expect(steps[1]).toMatch(/Bulk ferment 85 minutes, then shape and proof 60 minutes/);
   });
 });
+
+describe('Oct 18 work order, item 8: Spanish notes stay Spanish', () => {
+  it('writes the enriched-dough note in Spanish', () => {
+    const t = 'Brioche\n500g harina de fuerza\n250g leche\n100g mantequilla\n80g azúcar\n2 huevos\n10g sal\n7g levadura instantánea\nMétodo\n1. Mezcla todo. Deja levar 2 horas.\n2. Forma, deja levar 1 hora y hornea.';
+    const { notes } = convertToSourdough(parseRecipeText(t, 100).recipe);
+    expect(notes.map(n => n.message).join('\n')).not.toMatch(/Enriched dough|No yeast was found/);
+  });
+});
