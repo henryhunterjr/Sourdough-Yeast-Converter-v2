@@ -21,6 +21,7 @@ const T = {
     timeNote: 'Fermentation times are estimates. Go by the dough: it should look puffy and about 50% bigger before shaping, and springy but slow to fill a fingertip dent before baking.',
     levainWord: 'levain', allLevain: 'all of the levain', yeastWord: 'yeast',
     yeastKinds: { instant: 'instant yeast', 'active-dry': 'active dry yeast', fresh: 'fresh yeast' },
+    addYeastAfterRest: (kind: string) => `After the rest, add the ${kind} (it can go in with the salt) and mix until it's evenly worked in. Bulk fermentation counts from here, not from the first mix.`,
   },
   es: {
     buildLevain: (seed: number, flour: number, water: number, h: number) =>
@@ -33,6 +34,7 @@ const T = {
     timeNote: 'Los tiempos de fermentación son estimados. Guíate por la masa: debe verse esponjosa y un 50% más grande antes de formar, y volver despacio al presionar antes de hornear.',
     levainWord: 'levain', allLevain: 'todo el levain', yeastWord: 'levadura',
     yeastKinds: { instant: 'levadura instantánea', 'active-dry': 'levadura seca activa', fresh: 'levadura fresca' },
+    addYeastAfterRest: (kind: string) => `Después del reposo, añade la ${kind} (puede ir junto con la sal) y mezcla hasta integrarla bien. La fermentación en bloque cuenta desde aquí, no desde la primera mezcla.`,
   },
 } as const;
 
@@ -43,6 +45,11 @@ const YEAST_PROOF = /\b(dissolve|proof|bloom|activate|foamy|sprinkle)\w*\b[^.]*\
 const YEAST_ADD = /\b(whisk|stir|mix|add|sprinkle|combine)\b[^.]*\byeast\b|\b(mezcla|añade|agrega|espolvorea|bate)\w*\b[^.]*\blevadura\b/i;
 const YEAST_WAIT = /\b(let|allow)\b[^.]*\b(stand|sit|rest|proof)\b|\b(foamy|bubbly|bubbles|creamy)\b|\b(deja|dejar|reposa)\w*\b[^.]*\b(minutos|espum|burbuj)/i;
 const LEVAIN_BUILD = /\b(build|feed|refresh|prepare|make)\b[^.]*\b(levain|starter)\b[^.]*\b(night|hours? (before|ahead)|overnight|doubled|double|ripe|peak|bubbly)\b|\b(prepara|alimenta|refresca)\b[^.]*\b(levain|masa madre)\b[^.]*\b(noche|horas antes|duplic|burbuj)/i;
+/** A rest, autolyse or "rest X minutes" inside a mixing step. */
+const REST_CLAUSE = /\b(autolyse|autolysis|aut[oó]lisis|rest|rests|resting|reposa\w*|reposo)\b/i;
+/** Ways a step tells the baker to combine the starter with the liquid. */
+const STARTER_REF = /(?:ripe |active |madura |activa )?(?:levain|sourdough starter|starter|masa madre)/i;
+const BUILD_CONTINUES = /\b(cover|leave|let|sit|rest|until|doubled|domed|bubbly|ripe|peak|hours|tapa|deja|duplic|abombad|burbuj|horas)\b/i;
 const YEAST_AMOUNT = /\b\d+(?:[.,]\d+)?\s*(?:g|grams?|tsp|teaspoons?|tbsp|tablespoons?|packets?|envelopes?|cucharaditas?|cucharadas?|sobres?)\s+(?:of\s+|de\s+)?(?:(?:instant|active dry|dry|fresh)\s+)?yeast\b|\b\d+(?:[.,]\d+)?\s*(?:g|gramos?)\s+(?:de\s+)?levadura(?:\s+(?:instantánea|seca|fresca|activa))?\b/gi;
 
 /** Rise-time multipliers, yeast -> sourdough: [first rise, final proof]. */
@@ -96,14 +103,16 @@ const CLAUSE_SPLIT = /(?<=[,;:])\s+|\s+(?=(?:then|and then|while|before|after|un
  * Rescale times only inside clauses that talk about rising and not about
  * baking or cold retarding. Returns how many rise clauses were touched.
  */
-function rescaleRiseClauses(text: string, factor: number): { text: string; touched: number } {
+function rescaleRiseClauses(text: string, factorFor: (riseIndex: number) => number, firstIndex = 0): { text: string; touched: number } {
   let touched = 0;
   const sentences = text.split(SENTENCE_SPLIT).map(sentence => {
     if (!RISE_WORDS.test(sentence)) return sentence;
     const parts = splitKeeping(sentence, CLAUSE_SPLIT);
     return parts.map(part => {
       if (!RISE_WORDS.test(part) || BAKE_WORDS.test(part) || COLD_WORDS.test(part)) return part;
-      const r = rescaleTimes(part, factor);
+      // Each rise clause counts on its own: "rise 1 hour. Shape, proof 1 hour"
+      // in one step is a bulk rise followed by a final proof.
+      const r = rescaleTimes(part, factorFor(firstIndex + touched));
       if (r.changed) touched += 1;
       return r.text;
     }).join('');
@@ -138,6 +147,7 @@ export function editMethodToSourdough(
   for (const s of steps) {
     let changed: Step['changed'] = 'kept';
     let note: string | undefined;
+    if (s.text.trim() === T.en.timeNote || s.text.trim() === T.es.timeNote) continue;
 
     // Sentence-level: replace only the yeast-proofing sentence.
     // A proofing step is often two sentences: "whisk in the yeast" then "let stand until foamy".
@@ -169,9 +179,8 @@ export function editMethodToSourdough(
       changed = 'edited';
     }
     if (RISE_WORDS.test(text)) {
-      const factor = risesSeen === 0 ? firstRise : finalProof;
-      const r = rescaleRiseClauses(text, factor);
-      if (r.touched > 0) { text = r.text; changed = 'edited'; touchedTimes = true; risesSeen += 1; }
+      const r = rescaleRiseClauses(text, i => (i === 0 ? firstRise : finalProof), risesSeen);
+      if (r.touched > 0) { text = r.text; changed = 'edited'; touchedTimes = true; risesSeen += r.touched; }
     }
     out.push(note ? { text, changed, note } : { text, changed });
   }
@@ -210,10 +219,23 @@ export function editMethodToYeast(
       else inLevainBuild = false;
     }
 
+    // Yeast starts working the moment it's mixed in. If the step mixes the
+    // starter and then rests (an autolyse), keep the rest yeast-free and add
+    // the yeast afterwards, so the bulk time in the method stays true.
+    let yeastAfterRest = false;
+    // A kept copy of our own time note (from an earlier conversion) is not a step.
+    if (s.text.trim() === T.en.timeNote || s.text.trim() === T.es.timeNote) continue;
+    let buildRemoved = false;
     let text = s.text.split(SENTENCE_SPLIT).map(sentence => {
-      if (LEVAIN_BUILD.test(sentence)) { changed = 'edited'; note = `Removed: "${sentence}"`; return t.removedBuild; }
+      if (LEVAIN_BUILD.test(sentence)) { changed = 'edited'; note = `Removed: "${sentence}"`; buildRemoved = true; return t.removedBuild; }
+      // "Cover and leave 8 to 12 hours, until domed and doubled." after a removed build is part of it.
+      if (buildRemoved && BUILD_CONTINUES.test(sentence) && !/\b(flour|water|salt|dough|harina|agua|sal)\b/i.test(sentence)) { note += ` Removed: "${sentence}"`; return ''; }
       if (/\b(levain|starter|masa madre)\b/i.test(sentence)) {
         changed = 'edited';
+        if (REST_CLAUSE.test(s.text)) {
+          const without = dropStarterMention(sentence);
+          if (without && !/\b(levain|starter|masa madre)\b/i.test(without)) { yeastAfterRest = true; return without; }
+        }
         return sentence
           .replace(/\ball (of )?the (levain|starter)\b/gi, `the ${t.yeastWord}`)
           .replace(/\btod[oa] (el|la) (levain|masa madre)\b/gi, `la ${t.yeastWord}`)
@@ -223,16 +245,54 @@ export function editMethodToYeast(
           .replace(/\b(ripe |active |madura |activa )?(levain|sourdough starter|starter|masa madre)\b/gi, t.yeastWord);
       }
       return sentence;
-    }).join(' ');
+    }).filter(Boolean).join(' ');
     // A step that was only the levain build collapses to the note.
     if (text === t.removedBuild) { if (isSectionTitle(s.text)) inLevainBuild = true; out.push({ text, changed: 'edited', note }); continue; }
     if (RISE_WORDS.test(text)) {
-      const factor = 1 / (risesSeen === 0 ? firstRise : finalProof);
-      const r = rescaleRiseClauses(text, factor);
-      if (r.touched > 0) { text = r.text; changed = 'edited'; touchedTimes = true; risesSeen += 1; }
+      const r = rescaleRiseClauses(text, i => 1 / (i === 0 ? firstRise : finalProof), risesSeen);
+      if (r.touched > 0) { text = r.text; changed = 'edited'; touchedTimes = true; risesSeen += r.touched; }
     }
     out.push(note ? { text, changed, note } : { text, changed });
+    if (yeastAfterRest) out.push({ text: t.addYeastAfterRest(t.yeastKinds[ctx.yeastKind]), changed: 'added' });
   }
   if (touchedTimes) out.push({ text: t.timeNote, changed: 'added' });
+  // One line about the levain is enough: fold "no longer needed" into the intro.
+  const removed = out.filter(st => st.text === t.removedBuild);
+  if (removed.length) {
+    const first = out[0]!;
+    first.text = `${t.removedBuild} ${first.text}`;
+    first.changed = 'edited';
+    first.note = removed.map(st => st.note).filter(Boolean).join(' ') || undefined;
+    return out.filter(st => st.text !== t.removedBuild);
+  }
   return out;
+}
+
+/**
+ * Remove the starter from a mixing sentence without touching the rest of it:
+ * "Mix starter and water, add flour, rest 1 hour" -> "Mix the water, add flour, rest 1 hour".
+ * "Dissolve the levain in the water" -> "Add the water". Returns null when
+ * the sentence doesn't match a known shape, so the caller can fall back.
+ */
+function dropStarterMention(sentence: string): string | null {
+  const ref = STARTER_REF.source;
+  const det = '(?:the\\s+|your\\s+|all\\s+(?:of\\s+)?(?:the\\s+|your\\s+)|el\\s+|la\\s+|tod[oa]\\s+(?:el|la)\\s+|tu\\s+)?';
+  const rules: [RegExp, string][] = [
+    // "Dissolve the levain in(to) the water" / "Disuelve el levain en el agua"
+    [new RegExp(`\\b(?:dissolve|tear|break up|crumble)\\b[^,.]*?\\b${det}${ref}\\s+(?:into|in)\\s+${det}`, 'i'), 'Add the '],
+    [new RegExp(`\\b(?:disuelve|disolver|trocea)\\b[^,.]*?\\b${det}${ref}\\s+en\\s+${det}`, 'i'), 'Añade '],
+    // "Mix (the) starter and/with the water" -> "Mix the water"
+    [new RegExp(`\\b(mix|combine|stir|whisk|mezcla|combina|bate)\\s+(?:together\\s+)?${det}${ref}\\s+(?:and|with|con|y)\\s+${det}`, 'i'), '$1 the '],
+    // "Mix the water and (the) starter" -> "Mix the water"
+    [new RegExp(`\\s*(?:,\\s*)?(?:and|with|con|y)\\s+${det}${ref}\\b`, 'i'), ''],
+    // "Add the starter, water and flour" -> "Add the water and flour"
+    [new RegExp(`\\b(add|añade|agrega)\\s+${det}${ref}\\s*,\\s*`, 'i'), '$1 the '],
+  ];
+  for (const [re, rep] of rules) {
+    if (re.test(sentence)) {
+      const out = sentence.replace(re, rep).replace(/\bthe the\b/gi, 'the').replace(/\s{2,}/g, ' ');
+      return out;
+    }
+  }
+  return null;
 }

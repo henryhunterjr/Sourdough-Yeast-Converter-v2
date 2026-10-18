@@ -62,7 +62,9 @@ describe('a removed levain title takes its paragraph with it (simple method edit
     const text = 'Rolls\nLevain\n38g active starter\n77g water\n77g flour\nDough\nall of the levain\n200g water\n400g flour\n8g salt\nMethod\n1. BUILD LEVAIN (NIGHT BEFORE)\nMix 38g active starter, 77g water, and 77g flour. Cover and rest overnight until doubled.\n2. MIX DOUGH (MORNING)\nIn a large bowl, mix the water and flour until shaggy. Rest 30 minutes.\n3. BULK\nLet rise until doubled, about 4 hours.\n4. BAKE\nBake at 375F for 30 minutes.';
     const steps = convertToYeast(parseRecipeText(text, 100).recipe).recipe.steps.map(s => s.text);
     expect(steps.join('\n')).not.toMatch(/38g|active starter|yeast, 77g/i);
-    expect(steps.filter(s => s === 'The levain build is no longer needed.')).toHaveLength(1);
+    // One levain line, folded into the intro (Oct 18 work order, item 10).
+    expect(steps.filter(s => /levain/i.test(s))).toHaveLength(1);
+    expect(steps[0]).toMatch(/^The levain build is no longer needed\. /);
     expect(steps).toContain('MIX DOUGH (MORNING)');
   });
 });
