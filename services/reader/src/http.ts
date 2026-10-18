@@ -14,8 +14,13 @@ const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif
 
 export interface HandlerOptions {
   provider?: Provider | null;
-  /** Allowed origins for CORS. Default: '*'. */
-  allowOrigin?: string;
+  /**
+   * Allowed origins. A single '*' allows every site (the old default). A
+   * list allows only those origins: a browser request from any other origin
+   * (or with no Origin header at all) is refused with 403, since the AI
+   * reader runs on a paid API key. Entries may use a leading '*.' wildcard.
+   */
+  allowOrigin?: string | string[];
   /** Hard cap on pasted text, in characters. Default 20,000. */
   maxChars?: number;
   /** Up to 12 PDF pages/images, with a bounded combined request size. */
@@ -25,21 +30,26 @@ export interface HandlerOptions {
 
 export function handler(opts: HandlerOptions = {}) {
   const provider = opts.provider === undefined ? providerFromEnv() : opts.provider;
-  const origin = opts.allowOrigin ?? '*';
+  const allowed = opts.allowOrigin ?? '*';
   const maxChars = opts.maxChars ?? 20_000;
   const maxImages = opts.maxImages ?? 12;
   const maxImageChars = opts.maxImageChars ?? 6_000_000;
-  const cors = {
-    'access-control-allow-origin': origin,
-    'access-control-allow-headers': 'content-type',
-    'access-control-allow-methods': 'POST, OPTIONS',
-  };
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...cors } });
 
   return async (req: Request): Promise<Response> => {
-    if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+    const requestOrigin = req.headers.get('origin');
+    const permitted = allowed === '*' || (requestOrigin !== null && originAllowed(requestOrigin, allowed));
+    const cors = {
+      'access-control-allow-origin': allowed === '*' ? '*' : (permitted ? requestOrigin! : 'null'),
+      'access-control-allow-headers': 'content-type',
+      'access-control-allow-methods': 'POST, OPTIONS',
+      'vary': 'origin',
+    };
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...cors } });
+
+    if (req.method === 'OPTIONS') return new Response(null, { status: permitted ? 204 : 403, headers: cors });
     if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
+    if (!permitted) return json({ error: 'This endpoint only serves the converter app.' }, 403);
     const path = new URL(req.url).pathname.replace(/\/+$/, '');
     let body: any;
     try { body = await req.json(); } catch { return json({ error: 'Body must be JSON' }, 400); }
@@ -97,6 +107,38 @@ export function handler(opts: HandlerOptions = {}) {
 
     return json({ error: 'Unknown route. Use /read or /convert.' }, 404);
   };
+}
+
+/** "https://converter.example.com" against ["converter.example.com", "myapp-*.vercel.app"]. */
+export function originAllowed(origin: string, allowed: string | string[]): boolean {
+  if (allowed === '*') return true;
+  let host: string;
+  try { host = new URL(origin).host.toLowerCase(); } catch { return false; }
+  for (const entry of Array.isArray(allowed) ? allowed : [allowed]) {
+    const e = entry.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (!e) continue;
+    if (e === '*') return true;
+    // '*' in an entry matches one hostname label or part of one: "*.vercel.app", "myapp-*.vercel.app".
+    const re = new RegExp('^' + e.split('*').map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[a-z0-9-]*') + '$');
+    if (re.test(host)) return true;
+  }
+  return false;
+}
+
+/**
+ * The origins the converter is served from: production domains, this
+ * project's Vercel preview hosts, and local dev. Read from the environment
+ * so the list follows the deployment instead of a hard-coded hostname.
+ */
+export function appOriginsFromEnv(env: Record<string, string | undefined> = process.env): string[] {
+  const out = new Set<string>(['localhost:4173', 'localhost:5173', '127.0.0.1:4173', '127.0.0.1:5173']);
+  for (const v of [env.VERCEL_PROJECT_PRODUCTION_URL, env.VERCEL_URL, env.VERCEL_BRANCH_URL]) if (v) out.add(v);
+  for (const v of (env.APP_ORIGINS ?? '').split(',')) if (v.trim()) out.add(v.trim());
+  // Every preview of this project lives under <project>-*.vercel.app.
+  const prod = env.VERCEL_PROJECT_PRODUCTION_URL ?? '';
+  const project = prod.replace(/\.vercel\.app$/, '');
+  if (project && project !== prod) out.add(`${project}-*.vercel.app`), out.add(`${project}-git-*.vercel.app`);
+  return [...out];
 }
 
 function clampHydration(h: unknown): number {

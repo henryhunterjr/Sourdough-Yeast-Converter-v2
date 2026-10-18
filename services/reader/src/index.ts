@@ -4,4 +4,4 @@ export { anthropicProvider, geminiProvider, providerFromEnv, ProviderError } fro
 export type { Provider, ReadInput, ReadImage } from './providers.js';
 export { READ_RECIPE_JSON_SCHEMA, SYSTEM_PROMPT, COMPONENT_KINDS, ROLES } from './schema.js';
 export type { ReadRecipe, ReadComponent, ReadIngredient } from './schema.js';
-export { handler } from './http.js';
+export { handler, originAllowed, appOriginsFromEnv } from './http.js';
