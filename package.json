@@ -1,7 +1,7 @@
 {
   "name": "sourdough-yeast-converter",
   "private": true,
-  "version": "2.1.2",
+  "version": "2.2.0",
   "type": "module",
   "workspaces": [
     "packages/core",

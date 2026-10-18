@@ -54,6 +54,13 @@ const YEAST_AMOUNT = /\b\d+(?:[.,]\d+)?\s*(?:g|grams?|tsp|teaspoons?|tbsp|tables
 
 /** Rise-time multipliers, yeast -> sourdough: [first rise, final proof]. */
 const TO_SOURDOUGH: Record<Richness, [number, number]> = { lean: [3.5, 3], enriched: [4, 3], sweet: [4, 3] };
+/**
+ * Longest a rescaled rise may run at room temperature, in minutes. A brioche
+ * with a 2-hour yeasted rise would otherwise read "rise 8 hours", past the
+ * 4 to 7 hours the enriched-dough note promises; beyond this the baker
+ * should retard in the fridge instead.
+ */
+const MAX_ROOM_TEMP_RISE: Record<Richness, [number, number]> = { lean: [8 * 60, 4 * 60], enriched: [7 * 60, 4 * 60], sweet: [7 * 60, 4 * 60] };
 
 const TIME_UNIT = '(minutes?|mins?|hours?|hrs?|h|minutos?|horas?)';
 const TIME_RE = new RegExp(`(\\d+(?:[.,]\\d+)?(?:\\s+\\d/\\d)?|an?|una?|half an)\\s*(?:(?:to|-|–|a|or|y)\\s*(\\d+(?:[.,]\\d+)?(?:\\s+\\d/\\d)?))?\\s*${TIME_UNIT}\\b(\\s+(?:and a half|y media))?`, 'gi');
@@ -71,14 +78,23 @@ function toMinutes(raw: string, isHours: boolean, andHalf: boolean): number {
 }
 
 /** Parse "60 to 90 minutes", "1 1/2 hours", "an hour and a half", "2 horas" and rescale. */
-export function rescaleTimes(text: string, factor: number): { text: string; changed: boolean } {
+/** "1 hour 30 minutes", "2 hours and 15 minutes", "1 hora y 30 minutos": one length, not two. */
+const COMPOUND_TIME_RE = /\b(\d+(?:[.,]\d+)?|an?|una?)\s*(?:hours?|hrs?|h|horas?)\s+(?:and\s+|y\s+)?(\d+)\s*(?:minutes?|mins?|minutos?)\b/gi;
+
+export function rescaleTimes(text: string, factor: number, maxMinutes = Infinity): { text: string; changed: boolean } {
   let changed = false;
+  text = text.replace(COMPOUND_TIME_RE, (m: string, h: string, min: string, offset: number) => {
+    if (/\b(every|cada)\s*$/i.test(text.slice(0, offset))) return m;
+    changed = true;
+    const total = Math.min(maxMinutes, (toMinutes(h, true, false) + Number(min)) * factor);
+    return fmtRange(total, undefined, /minutos?/i.test(m) ? 'es' : 'en');
+  });
   const out = text.replace(TIME_RE, (m: string, lo: string, hi: string | undefined, unit: string, half: string | undefined, offset: number) => {
     // "every 30 minutes" is a fold cadence, not a rise length; leave it.
     if (/\b(every|cada)\s*$/i.test(text.slice(0, offset))) return m;
     const isHours = /^h/i.test(unit);
-    const a = toMinutes(lo, isHours, !!half) * factor;
-    const b = hi ? toMinutes(hi, isHours, false) * factor : undefined;
+    const a = Math.min(maxMinutes, toMinutes(lo, isHours, !!half) * factor);
+    const b = hi ? Math.min(maxMinutes, toMinutes(hi, isHours, false) * factor) : undefined;
     changed = true;
     return fmtRange(a, b, /minutos?|horas?/i.test(unit) ? 'es' : 'en');
   });
@@ -103,7 +119,7 @@ const CLAUSE_SPLIT = /(?<=[,;:])\s+|\s+(?=(?:then|and then|while|before|after|un
  * Rescale times only inside clauses that talk about rising and not about
  * baking or cold retarding. Returns how many rise clauses were touched.
  */
-function rescaleRiseClauses(text: string, factorFor: (riseIndex: number) => number, firstIndex = 0): { text: string; touched: number } {
+function rescaleRiseClauses(text: string, factorFor: (riseIndex: number) => number, firstIndex = 0, maxFor: (riseIndex: number) => number = () => Infinity): { text: string; touched: number } {
   let touched = 0;
   const sentences = text.split(SENTENCE_SPLIT).map(sentence => {
     if (!RISE_WORDS.test(sentence)) return sentence;
@@ -112,7 +128,7 @@ function rescaleRiseClauses(text: string, factorFor: (riseIndex: number) => numb
       if (!RISE_WORDS.test(part) || BAKE_WORDS.test(part) || COLD_WORDS.test(part)) return part;
       // Each rise clause counts on its own: "rise 1 hour. Shape, proof 1 hour"
       // in one step is a bulk rise followed by a final proof.
-      const r = rescaleTimes(part, factorFor(firstIndex + touched));
+      const r = rescaleTimes(part, factorFor(firstIndex + touched), maxFor(firstIndex + touched));
       if (r.changed) touched += 1;
       return r.text;
     }).join('');
@@ -140,6 +156,7 @@ export function editMethodToSourdough(
 ): Step[] {
   const t = T[ctx.language];
   const [firstRise, finalProof] = TO_SOURDOUGH[ctx.richness];
+  const [maxFirst, maxProof] = MAX_ROOM_TEMP_RISE[ctx.richness];
   const out: Step[] = [{ text: t.buildLevain(ctx.levain.seed, ctx.levain.flour, ctx.levain.water, ctx.levain.hydration), changed: 'added' }];
   let risesSeen = 0;
   let touchedTimes = false;
@@ -179,7 +196,7 @@ export function editMethodToSourdough(
       changed = 'edited';
     }
     if (RISE_WORDS.test(text)) {
-      const r = rescaleRiseClauses(text, i => (i === 0 ? firstRise : finalProof), risesSeen);
+      const r = rescaleRiseClauses(text, i => (i === 0 ? firstRise : finalProof), risesSeen, i => (i === 0 ? maxFirst : maxProof));
       if (r.touched > 0) { text = r.text; changed = 'edited'; touchedTimes = true; risesSeen += r.touched; }
     }
     out.push(note ? { text, changed, note } : { text, changed });

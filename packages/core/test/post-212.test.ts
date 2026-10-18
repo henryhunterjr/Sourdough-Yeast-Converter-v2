@@ -62,3 +62,17 @@ describe('Oct 18 work order, item 8: Spanish notes stay Spanish', () => {
     expect(notes.map(n => n.message).join('\n')).not.toMatch(/Enriched dough|No yeast was found/);
   });
 });
+
+describe('Oct 18 work order, item 7: rescaled rises stay inside the note\'s range', () => {
+  it('a brioche with a 2-hour yeasted rise says 7 hours, not 8, going to sourdough', () => {
+    const t = 'Brioche\n500g bread flour\n150g milk\n200g butter\n80g sugar\n4 eggs\n10g salt\n7g instant yeast\nMethod\n1. Mix and knead. Let rise 2 hours until doubled.\n2. Shape, proof 1 hour 30 minutes, then refrigerate overnight.\n3. Bake at 350F.';
+    const steps = convertToSourdough(parseRecipeText(t, 100).recipe).recipe.steps.map(s => s.text).join('\n');
+    expect(steps).toMatch(/Let rise 7 hours/);
+    expect(steps).not.toMatch(/8 hours/);
+    expect(steps).toMatch(/proof 4 hours/);
+  });
+  it('does not cap rises that already fit', () => {
+    const t = 'Rolls\n500g flour\n300g water\n10g salt\n5g instant yeast\nMethod\n1. Mix. Let rise 1 hour. Shape, proof 1 hour. Bake.';
+    expect(convertToSourdough(parseRecipeText(t, 100).recipe).recipe.steps[1]!.text).toBe('Mix. Let rise 3.5 hours. Shape, proof 3 hours. Bake.');
+  });
+});
