@@ -83,3 +83,17 @@ describe('conversion safety blocks misleading adapted methods', () => {
   });
 
 });
+
+describe('plain pasted sourdough recipes convert to yeast without tripping the gate (Oct 18 audit)', () => {
+  const cases: [string, string][] = [
+    ['en country loaf', 'Country Sourdough\n100g active starter\n375g water\n450g bread flour\n50g whole wheat flour\n10g salt\n\nMethod\n1. Mix starter and water, add flour, rest 1 hour.\n2. Add salt. Bulk ferment 4 to 5 hours with folds every 30 minutes.\n3. Shape and refrigerate overnight.\n4. Bake at 500F covered 20 minutes, uncovered 25 minutes.'],
+    ['en levain build', 'Levain\n20g starter\n50g flour\n50g water\nDough\nall of the levain\n450g bread flour\n330g water\n10g salt\n1. Build the levain the night before and let it double.\n2. Mix levain, water, flour, salt. Bulk 5 hours.\n3. Shape and bake.'],
+    ['es pan', 'Pan\n100 g masa madre activa\n350 g agua\n500 g harina de fuerza\n10 g sal\n1. Mezcla todo. Deja levar 5 horas. Forma. Deja levar 2 horas. Hornea a 230°C.'],
+  ];
+  for (const [label, text] of cases) {
+    it(label, () => {
+      const y = convertToYeast(parseRecipeText(text, 100).recipe).recipe;
+      expect(conversionSafety(y, 'to-yeast')).toEqual([]);
+    });
+  }
+});

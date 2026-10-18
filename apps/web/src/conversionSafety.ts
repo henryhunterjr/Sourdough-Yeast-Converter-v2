@@ -23,7 +23,7 @@ export function conversionSafety(recipe: Recipe, direction: 'to-yeast' | 'to-sou
         add('Sourdough starter-building directions were incorrectly rewritten as yeast instructions.');
       if (/\b(?:jar|doubled by morning)\b.{0,130}\byeast\b|\byeast\b.{0,130}\b(?:jar|doubled by morning)\b/i.test(line))
         add('Yeast is being treated like a sourdough starter in the method.');
-      if (!/^The levain build is no longer needed\.?$/i.test(line) && /\b(?:levain|sourdough starter|masa madre)\b/i.test(line))
+      if (!/^(?:The levain build is no longer needed|Ya no hace falta preparar el levain)\.?$/i.test(line) && /\b(?:levain|sourdough starter|masa madre)\b/i.test(line))
         add('The yeasted method still contains sourdough-specific directions.');
       for (const match of line.matchAll(/\b(\d+(?:[.,]\d+)?)\s*g(?:rams?)?\s+(?:(?:instant|active dry|fresh|dry)\s+)?yeast\b/gi)) {
         const listed = Number(match[1]!.replace(',', '.'));

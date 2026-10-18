@@ -63,6 +63,8 @@ export interface Ingredient {
    * recipe ("all of the levain"), so its flour and water are not counted twice.
    */
   isReference?: boolean;
+  /** Set by a conversion when it changed this line's amount; holds the grams before the change. */
+  adjustedFrom?: number;
 }
 
 export interface Component {

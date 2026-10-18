@@ -14,7 +14,7 @@ const T = {
     buildLevain: (seed: number, flour: number, water: number, h: number) =>
       `Build the levain the night before: mix ${ROUND.grams(seed)}g active starter (${h}% hydration), ${ROUND.grams(flour)}g flour, and ${ROUND.grams(water)}g water. Cover and leave at 75 to 78°F (24 to 26°C) for 8 to 12 hours, until domed and about doubled.`,
     dissolveLevain: 'Tear the levain into pieces and dissolve it in the liquid before adding the flour; sourdough needs no proofing step.',
-    skipLevain: (kind: string) => `Skip the levain build. This version uses ${kind}, which goes straight into the dry flour.`,
+    skipLevain: (kind: string) => `This version uses ${kind}, which goes straight into the dry flour. No proofing step needed.`,
     adyNote: 'Dissolve the active dry yeast in a few tablespoons of the recipe\'s liquid, warmed to 105 to 110°F (40 to 43°C), and let it sit 5 minutes before mixing.',
     freshNote: 'Crumble the fresh yeast into the liquid and stir until it dissolves, then mix as written.',
     removedBuild: 'The levain build is no longer needed.',
@@ -26,7 +26,7 @@ const T = {
     buildLevain: (seed: number, flour: number, water: number, h: number) =>
       `Prepara el levain la noche anterior: mezcla ${ROUND.grams(seed)}g de masa madre activa (${h}% de hidratación), ${ROUND.grams(flour)}g de harina y ${ROUND.grams(water)}g de agua. Tapa y deja a 24 a 26°C de 8 a 12 horas, hasta que esté abombado y casi duplicado.`,
     dissolveLevain: 'Trocea el levain y disuélvelo en el líquido antes de añadir la harina; la masa madre no necesita activarse.',
-    skipLevain: (kind: string) => `Omite la preparación del levain. Esta versión usa ${kind}, que va directa a la harina.`,
+    skipLevain: (kind: string) => `Esta versión usa ${kind}, que va directa a la harina. No hace falta activarla.`,
     adyNote: 'Disuelve la levadura seca activa en unas cucharadas del líquido de la receta, tibio (40 a 43°C), y espera 5 minutos antes de mezclar.',
     freshNote: 'Desmenuza la levadura fresca en el líquido y remueve hasta disolverla, luego mezcla como indica la receta.',
     removedBuild: 'Ya no hace falta preparar el levain.',

@@ -75,6 +75,7 @@ export function convertToSourdough(input: Recipe, opts: ToSourdoughOptions = {})
   // dough, so total flour stays exactly what the recipe had.
   const levainFlourLines: Ingredient[] = doughFlours.map(f => {
     const share = f.grams / doughFlourTotal;
+    f.adjustedFrom ??= f.grams;
     f.grams -= L * share;
     return { name: f.name, grams: addFlour * share, role: 'flour' };
   });
@@ -88,6 +89,7 @@ export function convertToSourdough(input: Recipe, opts: ToSourdoughOptions = {})
       if (wf <= 0) continue;
       const available = i.grams * wf;
       const used = Math.min(available, remaining);
+      i.adjustedFrom ??= i.grams;
       i.grams -= used / wf;
       remaining -= used;
     }
@@ -200,17 +202,17 @@ export function convertToYeast(input: Recipe, opts: ToYeastOptions = {}): Conver
   const doughFlours = doughs.flatMap(c => c.ingredients.filter(i => i.role === 'flour'));
   for (const [name, g] of flourByName) {
     const match = doughFlours.find(f => f.name.toLowerCase() === name.toLowerCase());
-    if (match) match.grams += g;
+    if (match) { match.adjustedFrom ??= match.grams; match.grams += g; }
     else { const ing: Ingredient = { name, grams: g, role: 'flour' }; mainDough.ingredients.push(ing); doughFlours.push(ing); }
   }
   const doughFlourTotal = doughFlours.reduce((s, i) => s + i.grams, 0);
   if (flourBack > 0) {
-    if (doughFlourTotal > 0) for (const f of doughFlours) f.grams += flourBack * (f.grams / doughFlourTotal);
+    if (doughFlourTotal > 0) for (const f of doughFlours) { f.adjustedFrom ??= f.grams; f.grams += flourBack * (f.grams / doughFlourTotal); }
     else mainDough.ingredients.push({ name: recipe.language === 'es' ? 'harina' : 'flour', grams: flourBack, role: 'flour' });
   }
   if (waterBack > 0) {
     const water = doughs.flatMap(c => c.ingredients).find(i => i.role === 'liquid');
-    if (water) water.grams += waterBack;
+    if (water) { water.adjustedFrom ??= water.grams; water.grams += waterBack; }
     else mainDough.ingredients.push({ name: recipe.language === 'es' ? 'agua' : 'water', grams: waterBack, role: 'liquid' });
   }
 

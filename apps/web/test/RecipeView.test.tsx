@@ -53,3 +53,15 @@ describe('RecipeView display parity (deterministic fixtures, no live AI)', () =>
     expect(model.recipe.components[0]!.ingredients.map(i => i.grams)).toEqual(parser.recipe.components[0]!.ingredients.map(i => i.grams));
   });
 });
+
+describe('changed lines never show the old cup measure as current (Oct 18 audit)', () => {
+  it('labels the original measure and gives the new one', async () => {
+    const { parseRecipeText } = await import('@bgb/dough-core');
+    const { recipe } = parseRecipeText('Rolls\n4 cups all-purpose flour\n1 cup warm milk\n1 packet active dry yeast\n1 tsp salt\n1. Mix. Rise 1 hour. Bake.', 100);
+    const html = renderToStaticMarkup(<RecipeView recipe={convertToSourdough(recipe).recipe} s={t('en')} />);
+    expect(html).toContain('about 3¼ cups · was: 4 cups all-purpose flour');
+    expect(html).toContain('was: 1 cup warm milk');
+    expect(html).toContain('1 tsp salt');
+    expect(html).not.toContain('was: 1 tsp salt');
+  });
+});

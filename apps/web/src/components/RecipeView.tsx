@@ -1,4 +1,4 @@
-import { analyze, ROUND, type Recipe, type Analysis } from '@bgb/dough-core';
+import { analyze, approxVolume, isVolumeUnit, ROUND, type Ingredient, type Recipe, type Analysis } from '@bgb/dough-core';
 import type { Strings } from '../i18n';
 
 const pct = (n: number) => `${ROUND.pct(n)}%`;
@@ -17,6 +17,15 @@ export function Stats({ a, s }: { a: Analysis; s: Strings }) {
   );
 }
 
+/** A changed line shows its new kitchen measure and labels the old one as the original. */
+function originalNote(ing: Ingredient, s: Strings, lang: 'en' | 'es'): string | null {
+  if (!ing.original) return null;
+  const changed = ing.adjustedFrom !== undefined && Math.abs(ing.adjustedFrom - ing.grams) >= 0.5;
+  if (!changed) return ing.original.text;
+  const vol = isVolumeUnit(ing.original.unit) ? approxVolume(ing.name, ing.grams, lang) : null;
+  return `${vol ? `${s.about} ${vol} · ` : ''}${s.was}: ${ing.original.text}`;
+}
+
 export function RecipeView({ recipe, s, highlightChanges, showSteps = true }: { recipe: Recipe; s: Strings; highlightChanges?: boolean; showSteps?: boolean }) {
   const a = analyze(recipe);
   return (
@@ -32,7 +41,7 @@ export function RecipeView({ recipe, s, highlightChanges, showSteps = true }: { 
                 <div className="n">
                   {ing.name}{ing.isReference && <span className="o">{s.ref}</span>}
                   {ing.original && (
-                    <span className="o">{ing.original.text}</span>
+                    <span className="o">{originalNote(ing, s, recipe.language ?? 'en')}</span>
                   )}
                 </div>
               </div>

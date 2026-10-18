@@ -102,9 +102,9 @@ export function parseAmount(raw: string): ParsedAmount | null {
   // 3) Leading amount + optional unit + name.
   const m = line.match(new RegExp(`^${AMOUNT_RE}\\s*(${UNIT_RE})?\\.?\\s+(?:of\\s+|de\\s+)?(.+)$`, 'i'));
   if (m) {
-    const amount = parseNumber(m[1]!);
     // A capital T is the old American shorthand for tablespoon; lowercase t is teaspoon.
     let unit = m[2] === 'T' ? 'tbsp' : (m[2] ?? '').toLowerCase();
+    const amount = parseNumber(m[1]!, unit);
     let name = m[3]!;
     // "1 large egg": size word is not a unit.
     if (!unit) {
@@ -118,13 +118,22 @@ export function parseAmount(raw: string): ParsedAmount | null {
   // 4) Trailing amount: "bread flour 500g" / "harina 500 g".
   const tail = line.match(new RegExp(`^(.+?)[,:]?\\s+${AMOUNT_RE}\\s*(${UNIT_RE})\\.?$`, 'i'));
   if (tail) {
-    return { amount: parseNumber(tail[2]!), unit: (tail[3] ?? '').toLowerCase(), name: cleanName(tail[1]!), text };
+    const unit = (tail[3] ?? '').toLowerCase();
+    return { amount: parseNumber(tail[2]!, unit), unit, name: cleanName(tail[1]!), text };
   }
 
   return null;
 }
 
-export function parseNumber(s: string): number {
+/**
+ * Units where "1,000" can only sensibly mean a thousand: grams, millilitres,
+ * or a bare number (which reads as grams). Everywhere else (kg, litres,
+ * pounds, cups) a comma is a decimal point, so "1,250 kg" is 1.25 kg.
+ */
+const THOUSANDS_OK = new Set(['', 'each', 'g', 'gram', 'grams', 'gr', 'gramo', 'gramos', 'ml', 'milliliter', 'milliliters', 'millilitre', 'millilitres', 'mililitro', 'mililitros']);
+
+export function parseNumber(s: string, unit = ''): number {
+  const thousands = THOUSANDS_OK.has(unit.toLowerCase());
   s = s.trim();
   // Range: take the first number.
   const range = s.match(/^(\d+(?:[.,]\d+)?)\s*[-–]\s*\d+/);
@@ -136,12 +145,16 @@ export function parseNumber(s: string): number {
   for (const part of s.split(/\s+/).filter(Boolean)) {
     const frac = part.match(/^(\d+)\/(\d+)$/);
     if (frac) total += Number(frac[1]) / Number(frac[2]);
-    else total += toNumber(part);
+    else total += toNumber(part, thousands);
   }
   return total;
 }
 
-function toNumber(s: string): number {
+function toNumber(s: string, thousands = true): number {
+  // "1,000g" and "2,500 ml" use a thousands separator. "1,5 kg", "0,250 kg"
+  // and "1,250 kg" are European decimals, so the rule only applies to gram
+  // and millilitre amounts that don't start with zero.
+  if (thousands && /^[1-9]\d{0,2}(?:,\d{3})+$/.test(s)) return Number(s.replace(/,/g, ''));
   return Number(s.replace(',', '.'));
 }
 
@@ -190,6 +203,38 @@ export function toGrams(p: ParsedAmount): GramsResult | null {
     return null;
   }
   return null;
+}
+
+const VOLUME_UNIT_WORDS = new Set(Object.keys(VOLUME_IN_CUPS).map(u => u.toLowerCase()));
+/** True when a typed unit is a US volume measure (cups, tbsp, tsp). */
+export function isVolumeUnit(unit: string): boolean {
+  return VOLUME_UNIT_WORDS.has(unit.toLowerCase()) || unit === 'T';
+}
+
+const FRACTIONS: [number, string][] = [[0, ''], [0.25, '¼'], [1 / 3, '⅓'], [0.5, '½'], [2 / 3, '⅔'], [0.75, '¾'], [1, '']];
+function fractionText(x: number): string {
+  const whole = Math.floor(x);
+  let best = FRACTIONS[0]!, err = Infinity;
+  for (const f of FRACTIONS) { const e = Math.abs(x - whole - f[0]); if (e < err) { err = e; best = f; } }
+  const w = best[0] === 1 ? whole + 1 : whole;
+  return `${w > 0 ? w : ''}${best[1]}` || '0';
+}
+
+/**
+ * A kitchen-friendly volume for an adjusted amount, e.g. "3¼ cups" or "2 tbsp".
+ * Returns null when the ingredient has no density. Always approximate.
+ */
+export function approxVolume(name: string, grams: number, lang: 'en' | 'es' = 'en'): string | null {
+  const cls = classify(name);
+  if (!cls.gramsPerCup || grams <= 0) return null;
+  const cups = grams / cls.gramsPerCup;
+  const u = lang === 'es'
+    ? { cup: 'taza', cups: 'tazas', tbsp: 'cda', tsp: 'cdta' }
+    : { cup: 'cup', cups: 'cups', tbsp: 'tbsp', tsp: 'tsp' };
+  if (cups >= 0.25) { const t = fractionText(cups); return `${t} ${cups > 1.12 ? u.cups : u.cup}`; }
+  const tbsp = cups * 16;
+  if (tbsp >= 1) return `${fractionText(tbsp)} ${u.tbsp}`;
+  return `${fractionText(cups * 48)} ${u.tsp}`;
 }
 
 export const ROUND = {
