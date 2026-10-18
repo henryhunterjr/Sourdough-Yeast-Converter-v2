@@ -2,11 +2,20 @@ import type { Recipe } from '@bgb/dough-core';
 import type { Strings } from '../i18n';
 
 // This identifies when to show handling guidance. It never changes the formula.
-const GRAIN = /\b(?:einkorn|spelt|dinkel|emmer|farro|khorasan|kamut|rye|centeno|espelta|escanda|ancient[ -]grains?|whole[ -]?(?:wheat|grain)|fresh(?:ly)?[ -]?(?:milled|ground))\b|\bintegral(?:es)?\b|granos?\s+antiguos?|reci[eé]n\s+molid[ao]s?/i;
+// Ancient grains, rye and fresh-milled flour change handling at any amount.
+const GRAIN = /\b(?:einkorn|spelt|dinkel|emmer|farro|khorasan|kamut|rye|centeno|espelta|escanda|ancient[ -]grains?|fresh(?:ly)?[ -]?(?:milled|ground))\b|granos?\s+antiguos?|reci[eé]n\s+molid[ao]s?/i;
+// Whole wheat only changes handling once it's a real share of the flour. A
+// country loaf with 10% whole wheat bakes like white bread.
+const WHOLE_WHEAT = /\bwhole[ -]?(?:wheat|grain)\b|\bintegral(?:es)?\b/i;
+export const WHOLE_WHEAT_NOTICE_SHARE = 0.25;
 
 export function needsGrainGuidance(recipe: Recipe): boolean {
-  return recipe.components.some(c => c.ingredients.some(i =>
-    (i.role === 'flour' || i.role === 'starter') && GRAIN.test(`${i.name} ${i.original?.text ?? ''}`)));
+  const flours = recipe.components.flatMap(c => c.ingredients).filter(i => i.role === 'flour' || i.role === 'starter');
+  const label = (i: typeof flours[number]) => `${i.name} ${i.original?.text ?? ''}`;
+  if (flours.some(i => GRAIN.test(label(i)))) return true;
+  const total = flours.reduce((sum, i) => sum + i.grams, 0);
+  const wholeWheat = flours.filter(i => WHOLE_WHEAT.test(label(i))).reduce((sum, i) => sum + i.grams, 0);
+  return total > 0 && wholeWheat / total >= WHOLE_WHEAT_NOTICE_SHARE;
 }
 
 export function adaptationText(original: Recipe, s: Strings): string {
