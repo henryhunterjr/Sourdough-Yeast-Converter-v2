@@ -154,7 +154,10 @@ export default function App() {
       <a className="skip-link" href="#workspace">{s.paste}</a>
       <header className="topbar">
         <div className="brand">
-          <img className="brand-logo" src="/brand/academy-logo.png" width="1280" height="720" alt="" />
+          <picture>
+            <source srcSet="/brand/academy-logo-360.webp" type="image/webp" />
+            <img className="brand-logo" src="/brand/academy-logo-360.png" width="360" height="243" alt="" />
+          </picture>
           <div className="brand-name">{s.academy}</div>
           <span className="brand-divider" />
           <span className="brand-tool">{s.shortName}</span>
@@ -287,7 +290,11 @@ export default function App() {
               <p>{s.unsafeExport}</p>
             </section>}
             <section className="card recipe-result" id="printable-recipe">
-              <div className="print-heading"><strong>{s.academy}</strong><span>{s.appName} · v{__APP_VERSION__}</span></div>
+              <div className="print-heading">
+                {/* Printed recipes and saved PDFs are Recipe Pantry products, so they carry its logo. */}
+                <img className="print-logo" src="/brand/recipe-pantry-logo-480.png" width="480" height="481" alt="Recipe Pantry" loading="eager" />
+                <span className="print-meta"><strong>{s.appName}</strong><span>recipepantry.app · v{__APP_VERSION__}</span></span>
+              </div>
               {tab === 'converted' && conversion ? (
                 <>
                   {original.title && <h2 className="recipe-title">{original.title}</h2>}
